@@ -1,19 +1,3 @@
-### Deep learning project seed
-Use this seed to start new deep learning / ML projects.
-
-- Built in setup.py
-- Built in requirements
-- Examples with MNIST
-- Badges
-- Bibtex
-
-#### Goals  
-The goal of this seed is to structure ML paper-code the same so that work can easily be extended and replicated.   
-
-### DELETE EVERYTHING ABOVE FOR YOUR PROJECT  
- 
----
-
 <div align="center">    
  
 # Your Project Name     
@@ -35,7 +19,7 @@ Conference
 </div>
  
 ## Description   
-What it does   
+We aim at an end-to-end solution for automatic generation of multiple choice questions for English exams. Creating such exam could be time-consuming, therefore, a model that can suggest question as well as possible choices could potentially speed up the process and improve the exam quality.
 
 ## How to run   
 First, install dependencies   
