@@ -214,14 +214,15 @@ class RaceDataset(Dataset):
             with open(path) as f:
                 data = json.load(f)
             for i in range(len(data["answers"])):
+                answer_idx = ord(data["answers"][i]) - ord("A")
+                answer = data["options"][i].pop(answer_idx)
+                distractors = data["options"][i]
                 self.dataset.append({
-                    "answer": data["answers"][i],
-                    "options": data["options"][i],
-                    "question": data["questions"][i],
                     "article": data["article"],
+                    "question": data["questions"][i],
+                    "answer": answer,
+                    "distractors": distractors,
                 })
-
-        # Change to textual correct answer and distractors
 
     def __len__(self):
         """"""
@@ -256,19 +257,22 @@ class RaceDataModule(LightningDataModule):
 
     def collate_fn(self, batch):
         """"""
-        questions = []
         articles = []
-        options = []
+        questions = []
+        answers = []
+        distractors = []
 
         for item in batch:
-            questions.append(item["question"])
             articles.append(item["article"])
-            options.append(self.tokenizer.sep_token.join(item["options"]))
+            questions.append(item["question"])
+            answers.append(item["answer"])
+            distractors.append(self.tokenizer.sep_token.join(item["distractors"]))
 
         return {
-            "questions": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
             "articles": self.tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
-            "options": self.tokenizer(options, padding=True, truncation=True, return_tensors="pt"),
+            "questions": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
+            "answers": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
+            "distractors": self.tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
         }
 
     def prepare_data(self):
