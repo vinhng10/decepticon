@@ -12,14 +12,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import nltk
-from nltk import sent_tokenize, word_tokenize
-nltk.download('punkt')
-
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
+
+import nltk
+from nltk import sent_tokenize, word_tokenize
+nltk.download('punkt')
 
 
 def tokenize(st):
@@ -98,7 +98,7 @@ class RaceDataProcessor:
             Processed question.
         """
         # Common process:
-        question = process_common(question)
+        question = self.process_common(question)
         # Remove question number and "." at the start
         question = "".join(re.split(r"\A\d*\. *", question))
         # Remove redundant duplicate of "-----":
@@ -122,7 +122,7 @@ class RaceDataProcessor:
         """
         for i in range(len(options)):
             # Remove redundant whitespace:
-            options[i] = process_common(options[i])
+            options[i] = self.process_common(options[i])
             # Remove redundant whitespace:
             options[i] = " ".join(options[i].split())
         return options
@@ -141,7 +141,7 @@ class RaceDataProcessor:
             Processed article.
         """
         # Common process:
-        article = process_common(article)
+        article = self.process_common(article)
         # Replace redundant duplicate of "-----" with "--":
         article = re.sub(r"--+", "--", article)
         # Remove redundant whitespace:
@@ -169,18 +169,23 @@ class RaceDataProcessor:
         """
         # Prepare path for saving processed data:
         save_path = Path(save_path)
+
         # Glob data paths:
         paths = Path(data_path).glob("*/*/*")
+
         # Process data:
         for path in tqdm(paths):
+            # Read data:
             with open(path) as f:
                 data = json.load(f)
+
             # Process article:
-            data["article"] = process_article(data["article"])
+            data["article"] = self.process_article(data["article"])
+
             # Process questions and options:
             for i in range(len(data["questions"])):
-                data["questions"][i] = process_question(data["questions"][i])
-                data["options"][i] = process_options(data["options"][i])
+                data["questions"][i] = self.process_question(data["questions"][i])
+                data["options"][i] = self.process_options(data["options"][i])
 
             # Create new file to save processed data:
             dataset = path.parent.parent.stem
@@ -215,6 +220,8 @@ class RaceDataset(Dataset):
                     "question": data["questions"][i],
                     "article": data["article"],
                 })
+
+        # Change to textual correct answer and distractors
 
     def __len__(self):
         """"""
@@ -252,10 +259,12 @@ class RaceDataModule(LightningDataModule):
         questions = []
         articles = []
         options = []
+
         for item in batch:
             questions.append(item["question"])
             articles.append(item["article"])
             options.append(self.tokenizer.sep_token.join(item["options"]))
+
         return {
             "questions": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
             "articles": self.tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
@@ -268,9 +277,11 @@ class RaceDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         """"""
+        # Prepare data paths:
         train_paths = Path(self.hparams.data_path).glob("train/*/*")
         val_paths = Path(self.hparams.data_path).glob("dev/*/*")
         test_paths = Path(self.hparams.data_path).glob("test/*/*")
+
         # Prepare datasets
         self.trainset = RaceDataset(train_paths)
         self.valset = RaceDataset(val_paths)
