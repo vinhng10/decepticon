@@ -254,6 +254,8 @@ class RaceDataModule(LightningDataModule):
         super().__init__()
         self.hparams = hparams
         self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        if self.hparams.pretrained_model == "t5-base":
+            self.tokenizer.add_special_tokens({'additional_special_tokens': ['<answer>', '<context>']})
 
     def collate_fn(self, batch):
         """"""
@@ -261,8 +263,19 @@ class RaceDataModule(LightningDataModule):
         questions = []
         answers = []
         distractors = []
-
+        
+        print("COLLATE based of %s" %self.hparams.pretrained_model)
         for item in batch:
+            if self.hparams.pretrained_model == "t5-base":
+                articles.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
+                questions.append(item["question"])
+                distractors.append(self.tokenizer.sep_token.join(item["distractors"]))
+                return {
+                    "articles": self.tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
+                    "questions": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
+                    "distractors": self.tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
+                }
+
             articles.append(item["article"])
             questions.append(item["question"])
             answers.append(item["answer"])
