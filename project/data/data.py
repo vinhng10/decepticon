@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from torch.utils.data import Dataset, DataLoader
+import torch
 from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
@@ -264,29 +265,29 @@ class RaceDataModule(LightningDataModule):
         answers = []
         distractors = []
         
-        print("COLLATE based of %s" %self.hparams.pretrained_model)
-        for item in batch:
-            if self.hparams.pretrained_model == "t5-base":
+        #print("COLLATE based of %s" %self.hparams.pretrained_model)
+        if self.hparams.pretrained_model in ["t5-base", "t5-small"]:
+            for item in batch:
                 articles.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
                 questions.append(item["question"])
-                #distractors.append(self.tokenizer.sep_token.join(item["distractors"]))
-                return {
-                    "articles": self.tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
-                    "questions": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
-                    #"distractors": self.tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
-                }
+            articles = self.tokenizer(articles, padding=True, 
+                                               truncation=True, 
+                                               return_tensors="pt", 
+                                               pad_to_max_length=True, 
+                                               max_length=512)
+            questions = self.tokenizer(questions, padding=True, 
+                                               truncation=True, 
+                                               return_tensors="pt", 
+                                               pad_to_max_length=True, 
+                                               max_length=512)
+            articles['input_ids'] = torch.squeeze(articles['input_ids'])
+            articles['attention_mask'] = torch.squeeze(articles['attention_mask'])
+            questions['input_ids'] = torch.squeeze(questions['input_ids'])
+            questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
+            return (articles, questions)
+        else:
+            raise NotImplementedError
 
-            articles.append(item["article"])
-            questions.append(item["question"])
-            answers.append(item["answer"])
-            distractors.append(self.tokenizer.sep_token.join(item["distractors"]))
-
-        return {
-            "articles": self.tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
-            "questions": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
-            "answers": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
-            "distractors": self.tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
-        }
 
     def prepare_data(self):
         """"""
