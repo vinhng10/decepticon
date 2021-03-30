@@ -6,7 +6,7 @@ from time import sleep
 import torch
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import NeptuneLogger
+from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.nn import functional as F
 from models.t5 import *
@@ -19,8 +19,16 @@ def main(hparams):
     #hparams.tokenizer_len = len(data_module.tokenizer)
     
     model = T5FinetuneForRACE(hparams)
+    logger = NeptuneLogger()
+    
+    checkpoint_callback = ModelCheckpoint(monitor = None,
+                                          dirpath = "checkpoint/",
+                                          verbose = True,
+                                          filename = str(hparams.version).replace(".", "_"))
     
     trainer = Trainer(accumulate_grad_batches=hparams.accumulate_grad_batches,
+                      checkpoint_callback = checkpoint_callback,
+                      logger = logger,
                       terminate_on_nan = hparams.terminate_on_nan,
                       max_epochs = 10,
                       gradient_clip_val = 0.5,
