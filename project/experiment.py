@@ -19,7 +19,9 @@ def main(hparams):
     #hparams.tokenizer_len = len(data_module.tokenizer)
     
     model = T5FinetuneForRACE(hparams)
-    logger = NeptuneLogger()
+    logger = NeptuneLogger(project_name="carlomarxdk/T5-for-RACE",
+    params=hparams,
+        api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
     
     checkpoint_callback = ModelCheckpoint(monitor = None,
                                           dirpath = "checkpoint/",
