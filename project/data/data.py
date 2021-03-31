@@ -284,7 +284,7 @@ class RaceDataModule(LightningDataModule):
         return {
             "articles": self.tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
             "questions": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
-            "answers": self.tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
+            "answers": self.tokenizer(answers, padding=True, truncation=True, return_tensors="pt"),
             "distractors": self.tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
         }
 
