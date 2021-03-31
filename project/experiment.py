@@ -34,6 +34,7 @@ def main(hparams):
                       logger = logger,
                       terminate_on_nan = hparams.terminate_on_nan,
                       benchmark = False,
+                      precision = 16,
                       #log_gpy_memory = True,
                       track_grad_norm = 2,
                       max_epochs = 5,
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     # DATA
     parser.add_argument("--data_path", default = "D:\Github/decepticon/Processed_New", type=str)
     parser.add_argument("--batch_size", default = 16, type=int)
-    parser.add_argument("--num_workers", default = 2, type=int)
+    parser.add_argument("--num_workers", default = 0, type=int)
     parser.add_argument("--padding_token", default = 0, type=int) # do not change that
     
     # LOGGER
