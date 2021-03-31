@@ -8,22 +8,26 @@ from transformers import  T5ForConditionalGeneration, T5Config, get_linear_sched
 
 
 class T5FinetuneForRACE(pl.LightningModule):
-    def __init__(self, hparams):
+    def __init__(self, hparams, tokenizer):
         super(T5FinetuneForRACE, self).__init__()
         self.save_hyperparameters()
         self.hparams = hparams
+        self.tokenizer = tokenizer
         if self.hparams.pretrained_model in ["t5-base","t5-small"]:
             config = T5Config(decoder_start_token_id = self.hparams.padding_token)
             self.model = T5ForConditionalGeneration(config).from_pretrained(self.hparams.pretrained_model)
-            self.model.resize_token_embeddings(self.hparams.tokenizer_len)
+            self.model.resize_token_embeddings(len(self.tokenizer))
         else:
             raise NotImplementedError
             
             
     def mask_label_padding(self, labels):
         MASK_ID = -100
-        labels[labels == self.hparams.padding_id] = MASK_ID 
+        labels[labels == self.hparams.padding_token] = MASK_ID 
         return labels
+    
+    def decode(self, sequence):
+        return [self.tokenizer.decode(token) for token in sequence]
  
     def forward(self, ids, mask, labels):
         return self.model(input_ids = ids, attention_mask = mask, labels = labels)
@@ -35,10 +39,13 @@ class T5FinetuneForRACE(pl.LightningModule):
         loss = output.loss
         
         ## logger
+        #if self.trainer.global_step % 50 == 0:
         self.logger.experiment.log_metric('train_loss', loss.detach())
         self.logger.experiment.log_metric('train_perplexity', torch.exp(loss.detach()))
         return loss
-
+     def on_test_epoch_end(self):
+        logger.experiment.log_artifact('checkpoints/')
+        
     def validation_step(self, batch, batch_idx):
         x, y = batch
         output = self(x["input_ids"], x["attention_mask"], self.mask_label_padding(y["input_ids"]))
