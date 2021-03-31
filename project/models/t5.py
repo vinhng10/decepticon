@@ -10,7 +10,7 @@ from transformers import  T5ForConditionalGeneration, T5Config, get_linear_sched
 class T5FinetuneForRACE(pl.LightningModule):
     def __init__(self, hparams, tokenizer):
         super(T5FinetuneForRACE, self).__init__()
-        self.save_hyperparameters()
+        #self.save_hyperparameters()
         self.hparams = hparams
         self.tokenizer = tokenizer
         if self.hparams.pretrained_model in ["t5-base","t5-small"]:
@@ -43,7 +43,7 @@ class T5FinetuneForRACE(pl.LightningModule):
         self.logger.experiment.log_metric('train_loss', loss.detach())
         self.logger.experiment.log_metric('train_perplexity', torch.exp(loss.detach()))
         return loss
-     def on_test_epoch_end(self):
+    def on_test_epoch_end(self):
         logger.experiment.log_artifact('checkpoints/')
         
     def validation_step(self, batch, batch_idx):

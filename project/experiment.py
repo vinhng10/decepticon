@@ -18,12 +18,10 @@ def main(hparams):
     data = RaceDataModule(hparams)
     #hparams.tokenizer_len = len(data_module.tokenizer)
     
-    model = T5FinetuneForRACE(hparams)
+    model = T5FinetuneForRACE(hparams, data.tokenizer)
     logger = NeptuneLogger(project_name="carlomarxdk/T5-for-RACE",
-                           params = hparams,
-                           experiment_name = "T5 finetuning to race: %s" %str(hparams.version),
-                           tag = "finetuning",
-            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
+                           params = vars(hparams),
+                           experiment_name = "T5 finetuning to race: %s" %str(hparams.version),            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
     
     checkpoint_callback = ModelCheckpoint(monitor = None,
                                           dirpath = "checkpoints/",
@@ -35,15 +33,15 @@ def main(hparams):
                       callbacks = LearningRateMonitor(),
                       logger = logger,
                       terminate_on_nan = hparams.terminate_on_nan,
-                      benchmark = True,
-                      log_gpy_memory = True,
+                      benchmark = False,
+                      #log_gpy_memory = True,
                       track_grad_norm = 2,
                       max_epochs = 5,
                       log_every_n_steps = 150,
                       gradient_clip_val = 0.5,
-                      stochastic_weight_averaging = True,
+                      stochastic_weight_avg = False,
                       gpus=-1)
-    trainer.fit(model, data_module)
+    trainer.fit(model, data)
     
     print("Fine Tuning: Finilised")
 
@@ -53,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument("--version", type=float) ## you need to specify it on a form X.XX 
 
     # DATA
-    parser.add_argument("--data_path", default = "d:Github/decepticon/Processed_New/", type=str)
+    parser.add_argument("--data_path", default = "D:\Github/decepticon/Processed_New", type=str)
     parser.add_argument("--batch_size", default = 16, type=int)
     parser.add_argument("--num_workers", default = 2, type=int)
     parser.add_argument("--padding_token", default = 0, type=int) # do not change that
