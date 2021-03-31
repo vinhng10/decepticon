@@ -19,6 +19,7 @@ class T5FinetuneForRACE(pl.LightningModule):
         else:
             raise NotImplementedError
             
+            
     def mask_label_padding(self, labels):
         MASK_ID = -100
         labels[labels == self.hparams.padding_id] = MASK_ID 
@@ -32,12 +33,19 @@ class T5FinetuneForRACE(pl.LightningModule):
         x, y = batch
         output = self(x["input_ids"], x["attention_mask"], self.mask_label_padding(y["input_ids"]))
         loss = output.loss
+        
+        ## logger
+        self.logger.experiment.log_metric('train_loss', loss.detach())
+        self.logger.experiment.log_metric('train_perplexity', torch.exp(loss.detach()))
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         output = self(x["input_ids"], x["attention_mask"], self.mask_label_padding(y["input_ids"]))
         loss = output[0]
+        ### logger
+        self.logger.experiment.log_metric('val_loss', loss.detach())
+        self.logger.experiment.log_metric('val_perplexity', torch.exp(loss.detach()))
         return loss
 
     def test_step(self, batch, batch_idx):

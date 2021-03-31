@@ -7,7 +7,7 @@ import torch
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers.neptune import NeptuneLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from torch.nn import functional as F
 from models.t5 import *
 from data.data import *
@@ -20,8 +20,10 @@ def main(hparams):
     
     model = T5FinetuneForRACE(hparams)
     logger = NeptuneLogger(project_name="carlomarxdk/T5-for-RACE",
-    params=hparams,
-        api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
+                           params = hparams,
+                           experiment_name = "T5 finetuning to race",
+                           tag = "finetuning",
+            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
     
     checkpoint_callback = ModelCheckpoint(monitor = None,
                                           dirpath = "checkpoint/",
@@ -30,9 +32,12 @@ def main(hparams):
     
     trainer = Trainer(accumulate_grad_batches=hparams.accumulate_grad_batches,
                       checkpoint_callback = checkpoint_callback,
+                      callbacks = LearningRateMonitor()
                       logger = logger,
                       terminate_on_nan = hparams.terminate_on_nan,
-                      max_epochs = 10,
+                      benchmark = True,
+                      max_epochs = 5,
+                      log_every_n_steps = 100,
                       gradient_clip_val = 0.5,
                       stochastic_weight_averaging = True,
                       gpus=-1)
@@ -61,9 +66,9 @@ if __name__ == '__main__':
     # TRAINING
     parser.add_argument("--seed", default = 2020, type=float)
     parser.add_argument("--weight_decay", default = 1e-5, type=float)
-    parser.add_argument("--learning_rate", default = 1e-5, type=float)
-    parser.add_argument("--accumulate_grad_batches", default=10, type=int)
-    parser.add_argument("--terminate_on_nan", default=True, type=int)
+    parser.add_argument("--learning_rate", default = 1e-4, type=float)
+    parser.add_argument("--accumulate_grad_batches", default = 10, type=int)
+    parser.add_argument("--terminate_on_nan", default = True, type=int)
     
     
     main(parser)
