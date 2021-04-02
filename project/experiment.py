@@ -18,7 +18,7 @@ def main(hparams):
     data = RaceDataModule(hparams)
     #hparams.tokenizer_len = len(data_module.tokenizer)
     
-    model = T5FinetuneForRACE(hparams, data.tokenizer)
+    model = T5FinetuneForRACE(hparams)
     logger = NeptuneLogger(project_name="carlomarxdk/T5-for-RACE",
                            params = vars(hparams),
                            experiment_name = "T5 finetuning to race: %s" %str(hparams.version),            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')

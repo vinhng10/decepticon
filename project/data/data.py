@@ -236,26 +236,13 @@ class RaceDataset(Dataset):
 
 class RaceDataModule(LightningDataModule):
     """ Race Data Module """
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        """"""
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--data_path", type=str,
-                            help="Path to data.")
-        parser.add_argument("--batch_size", type=int, default=256,
-                            help="Batch size.")
-        parser.add_argument("--num_workers", type=int, default=8,
-                            help="Number of workers for data loading.")
-        parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny",
-                            help="Pretrained model.")
-        return parser
 
     def __init__(self, hparams):
         """"""
         super().__init__()
         self.hparams = hparams
         self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
-        if self.hparams.pretrained_model == "t5-base":
+        if self.hparams.pretrained_model in ["t5-base", "t5-small"]:
             self.tokenizer.add_special_tokens({'additional_special_tokens': ['<answer>', '<context>']})
 
     def collate_fn(self, batch):

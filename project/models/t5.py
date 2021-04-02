@@ -8,15 +8,17 @@ from transformers import  T5ForConditionalGeneration, T5Config, get_linear_sched
 
 
 class T5FinetuneForRACE(pl.LightningModule):
-    def __init__(self, hparams, tokenizer):
+    def __init__(self, hparams):
         super(T5FinetuneForRACE, self).__init__()
         #self.save_hyperparameters()
         self.hparams = hparams
-        self.tokenizer = tokenizer
         if self.hparams.pretrained_model in ["t5-base","t5-small"]:
             config = T5Config(decoder_start_token_id = self.hparams.padding_token)
             self.model = T5ForConditionalGeneration(config).from_pretrained(self.hparams.pretrained_model)
-            self.model.resize_token_embeddings(len(self.tokenizer))
+            try:
+                self.model.resize_token_embeddings(hparams.tokenizer_len)
+            except:
+                self.model.resize_token_embeddings(32102)
         else:
             raise NotImplementedError
             
@@ -28,6 +30,8 @@ class T5FinetuneForRACE(pl.LightningModule):
     
     def decode(self, sequence):
         return [self.tokenizer.decode(token) for token in sequence]
+    
+#     def generate(self,)
  
     def forward(self, ids, mask, labels):
         return self.model(input_ids = ids, attention_mask = mask, labels = labels)
