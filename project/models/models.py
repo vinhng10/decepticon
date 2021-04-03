@@ -82,10 +82,10 @@ class RaceModule(pl.LightningModule):
         # Decode:
         tgt = self.embedding(target["input_ids"]).permute((1, 0, 2))
         tgt_mask = self.generate_tgt_mask(tgt.shape[0]).to(tgt.device)
-        tgt_key_padding_mask = target["attention_mask"] == 1
-        memory_key_padding_mask = input["attention_mask"] == 1
-        decode = self.decoder(tgt, encode, tgt_mask, tgt_key_padding_mask=tgt_key_padding_mask)#,
-                              #memory_key_padding_mask=memory_key_padding_mask)
+        tgt_key_padding_mask = target["attention_mask"] == 0
+        memory_key_padding_mask = input["attention_mask"] == 0
+        decode = self.decoder(tgt, encode, tgt_mask, tgt_key_padding_mask=tgt_key_padding_mask,
+                              memory_key_padding_mask=memory_key_padding_mask)
 
         # Head:
         output = F.softmax(self.head(decode), dim=-1)
