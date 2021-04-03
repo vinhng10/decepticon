@@ -271,6 +271,7 @@ class RaceDataModule(LightningDataModule):
             articles['attention_mask'] = torch.squeeze(articles['attention_mask'])
             questions['input_ids'] = torch.squeeze(questions['input_ids'])
             questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
+
             return (articles, questions)
         else:
             raise NotImplementedError
