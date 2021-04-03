@@ -1,12 +1,4 @@
 # Python Import:
-import os
-import shutil
-import joblib
-import numpy as np
-import pandas as pd
-import datetime
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from argparse import ArgumentParser
 
 # Pytorch Import:
@@ -25,88 +17,6 @@ from pytorch_lightning.loggers import TensorBoardLogger
 # HuggingFace Import:
 from transformers import AutoTokenizer, AutoModel
 
-class RaceDataset(Dataset):
-    def __init__(self, dataset):
-        self.dataset = dataset
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, idx):
-        return None
-
-
-class RaceDataModule(pl.LightningDataModule):
-    """"""
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        """ Args:
-                data_dir (str): Data directory.
-                batch_size (int): Bacth size.
-                source_len (int): Length of input sequence.
-                target_len (int): Length of target sequence.
-                step (int): Window size.
-                test_size (float): Percentage of test dataset.
-                val_size (float): Percentage of valid dataset (exclude test dataset).
-                num_workers (int): Number of workers for data loading.
-        """
-        parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--data_dir", type=str)
-        parser.add_argument("--batch_size", type=int, default=256)
-        parser.add_argument("--source_len", type=int, default=192)
-        parser.add_argument("--target_len", type=int, default=32)
-        parser.add_argument("--step", type=int, default=1)
-        parser.add_argument("--test_size", type=float, default=0.3)
-        parser.add_argument("--val_size", type=float, default=0.25)
-        parser.add_argument("--num_workers", type=int, default=8)
-        parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny")
-        return parser
-
-    def __init__(self, hparams):
-        super(RaceDataModule, self).__init__()
-        self.hparams = hparams
-        self.tokenizer = AutoTokenizer(hparams.pretrained_model)
-        self.backbone = AutoModel(hparams.pretrained_model)
-
-    def prepare_data(self):
-
-    def setup(self, stage=None):
-
-        # Prepare datasets
-        self.trainset = RaceDataset()
-        self.valset = RaceDataset()
-        self.testset = RaceDataset()
-
-    def train_dataloader(self):
-        self.train_loader = DataLoader(
-            self.trainset,
-            batch_size=self.hparams.batch_size,
-            shuffle=True,
-            num_workers=self.hparams.num_workers,
-            pin_memory=True
-        )
-        return self.train_loader
-
-    def val_dataloader(self):
-        self.val_loader = DataLoader(
-            self.valset,
-            batch_size=self.hparams.batch_size,
-            shuffle=False,
-            num_workers=self.hparams.num_workers,
-            pin_memory=True
-        )
-        return self.val_loader
-
-    def test_dataloader(self):
-        self.test_loader = DataLoader(
-            self.testset,
-            batch_size=self.hparams.batch_size,
-            shuffle=False,
-            num_workers=self.hparams.num_workers,
-            pin_memory=True
-        )
-        return self.test_loader
-
 
 class RaceModule(pl.LightningModule):
     """"""
@@ -122,64 +32,37 @@ class RaceModule(pl.LightningModule):
                 lr (float): Learning rate.
         """
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--source_size", type=int, default=4)
-        parser.add_argument("--target_size", type=int, default=4)
-        parser.add_argument("--hidden_size", type=int, default=256)
-        parser.add_argument("--num_layers", type=int, default=1)
-        parser.add_argument("--bidirectional", type=bool, default=False)
-        parser.add_argument("--dropout", type=float, default=0.0)
+        parser.add_argument("--d_model", type=int, default=256)
+        parser.add_argument("--nhead", type=int, default=1)
+        parser.add_argument("--num_layers", type=bool, default=False)
         parser.add_argument("--learning_rate", type=float, default=1e-3)
+        parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny",
+                            help="Pretrained model.")
         return parser
 
     def __init__(self, hparams):
-        super(RaceModule, self).__init__()
-        self.hparams = hparams
+        super().__init__()
+
         # Encoder:
-        num_directions = 2 if self.hparams.bidirectional else 1
-        self.en_gru = nn.GRU(
-            self.hparams.source_size,
-            self.hparams.hidden_size,
-            self.hparams.num_layers,
-            dropout=self.hparams.dropout if self.hparams.num_layers else 0,
-            bidirectional=self.hparams.bidirectional,
-            batch_first=True
-        )
-        self.en_fc = nn.Linear(
-            self.hparams.num_layers*num_directions,
-            self.hparams.num_layers
-        )
+        self.encoder = AutoModel.from_pretrained(hparams.pretrained_model)
+        for param in self.encoder.parameters():
+            param.requires_grad = False
 
         # Decoder:
-        self.de_gru = nn.GRU(
-            self.hparams.target_size,
-            self.hparams.hidden_size,
-            self.hparams.num_layers,
-            dropout=self.hparams.dropout if self.hparams.num_layers else 0,
-            batch_first=True
-        )
-        self.de_fc = nn.Linear(
-            self.hparams.hidden_size,
-            self.hparams.target_size
-        )
+        self.embedding = self.encoder.embeddings
+        self.decoder_layer = nn.TransformerDecoderLayer(d_model=hparams.d_model, nhead=hparams.nhead)
+        self.decoder = nn.TransformerDecoder(self.decoder_layer, hparams.num_layers)#, nn.LayerNorm(hparams.d_model, 1e-12))
 
-    def encode(self, input, hidden=None):
-        """ Args:
-                input (batch, seq_len, source_size): Input sequence.
-                hidden (num_layers*num_directions, batch, hidden_size): Initial states.
+        # Head:
+        self.head = nn.Linear(hparams.d_model, self.encoder.embeddings.word_embeddings.num_embeddings)
 
-            Returns:
-                output (batch, seq_len, num_directions*hidden_size): Outputs at every step.
-                hidden (num_layers, batch, hidden_size): Final state.
-        """
-        # Feed source sequences into GRU:
-        outputs, hidden = self.en_gru(input, hidden)
-        # Compress bidirection to one direction for decoder:
-        hidden = hidden.permute(1, 2, 0)
-        hidden = self.en_fc(hidden)
-        hidden = hidden.permute(2, 0, 1)
-        return outputs, hidden.contiguous()
+    def generate_tgt_mask(self, size):
+        """"""
+        mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        return mask
 
-    def forward(self, hidden, pred_len=32, target=None, teacher_forcing=0.0):
+    def forward(self, input, target):
         """ Args:
                 hidden (num_layers, batch, hidden_size): States of the GRU.
                 pred_len (int): Length of predicted sequence.
@@ -193,32 +76,21 @@ class RaceModule(pl.LightningModule):
                     of words in the target language.
                 hidden of shape (1, batch_size, hidden_size): New states of the GRU.
         """
-        if target is None:
-            assert not teacher_forcing, 'Cannot use teacher forcing without a target sequence.'
+        # Encode:
+        encode = self.encoder(**input).last_hidden_state.permute((1, 0, 2))
 
-        # Determine constants:
-        batch = hidden.shape[1]
-        # Initial value to feed to the GRU:
-        val = torch.zeros((batch, 1, self.hparams.target_size), device=hidden.device)
-        if target is not None:
-            target = torch.cat([val, target[:, :-1, :]], dim=1)
-            pred_len = target.shape[1]
-        # Sequence to record the predicted values:
-        outputs = list()
-        for i in range(pred_len):
-            # Embed the value at ith time step:
-            # If teacher_forcing then use the target value at current step
-            # Else use the predicted value at previous step:
-            val = target[:, i:i+1, :] if (np.random.rand() < teacher_forcing) else val
-            # Feed the previous value and the hidden to the network:
-            output, hidden = self.de_gru(val, hidden)
-            # Predict new output:
-            val = self.de_fc(output.relu()).sigmoid()
-            # Record the predicted value:
-            outputs.append(val)
-        # Concatenate predicted values:
-        outputs = torch.cat(outputs, dim=1)
-        return outputs, hidden
+        # Decode:
+        tgt = self.embedding(target["input_ids"]).permute((1, 0, 2))
+        tgt_mask = self.generate_tgt_mask(tgt.shape[0]).to(tgt.device)
+        tgt_key_padding_mask = target["attention_mask"] == 1
+        memory_key_padding_mask = input["attention_mask"] == 1
+        decode = self.decoder(tgt, encode, tgt_mask, tgt_key_padding_mask=tgt_key_padding_mask)#,
+                              #memory_key_padding_mask=memory_key_padding_mask)
+
+        # Head:
+        output = F.softmax(self.head(decode), dim=-1)
+
+        return output, encode, decode, tgt
 
     def configure_optimizers(self):
         optimizer = Adam(self.parameters(), lr=self.hparams.learning_rate)
