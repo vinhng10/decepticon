@@ -251,7 +251,7 @@ class RaceDataModule(LightningDataModule):
                             help="Number of workers for data loading.")
         parser.add_argument("--special_tokens", nargs="*", default=["[CON]", "[QUE]", "[ANS]", "[DIS]"],
                             help="Additional special tokens.")
-        parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny",
+        parser.add_argument("--dm_pretrained_model", type=str, default="prajjwal1/bert-tiny",
                             help="Pretrained model.")
         return parser
 
@@ -286,7 +286,7 @@ class RaceDataModule(LightningDataModule):
         else:
             self.collate_fn = self.default_collate_fn
 
-        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.dm_pretrained_model)
         self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
 
     def prepare_data(self):
