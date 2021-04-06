@@ -1,4 +1,6 @@
 # Python Import:
+import torch
+import numpy as np
 from argparse import ArgumentParser
 
 # Pytorch Lightning Import:
@@ -8,50 +10,45 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 
 from data.data import RaceDataModule
-from models.rnn import RaceRNNModule
+from models.model import RaceRNNModule
+
+
+def translate(vocab, ans, output, tgt):
+    """
+    Args:
+        vocab dictionary of [index, word]
+        ans (seq_len) np.array
+        tgt (seq_len) np.array
+        output (seq_len, vocab_size) np.array
+    """
+    output = np.argmax(output, axis=1)
+    ans_str = ' '.join([vocab[i] for i in ans if i != 0])
+    tgt_str = ' '.join([vocab[i] for i in tgt if i != 0])
+    out_str = ' '.join([vocab[i] for i in output if i != 0])
+    print("\n============================")
+    print("ANS:", ans_str)
+    print("TGT:", tgt_str)
+    print("OUT:", out_str)
 
 
 if __name__ == "__main__":
     pl.seed_everything(1234)
 
     parser = ArgumentParser()
-
-    # --------------
-    #  data args
-    # --------------
-    parser.add_argument("-f", "--file", required=False)
-    parser.add_argument("--vocab_size", type=int, default=30522,
-                        help="vocab size")
-    parser.add_argument("--max_len_q", type=int, default=500,
-                        help="Max length of question"),
-    parser.add_argument("--num_workers", type=int, default=0,
-                        help="Number of workers for data loading. Set to 0 if running on Windows")
-    parser.add_argument("--data_path", type=str, default='data/RACE_processed',
-                        help="Path to data.")
-    parser.add_argument("--is_preprocessed", type=bool, default=True,
-                        help="Set it to False if the data requires preprocessing"),
-    parser.add_argument("--batch_size", type=int, default=64)
-
-    # --------------
-    #  model args
-    # --------------
-    parser.add_argument("--embed_dim", type=int, default=100)
-    parser.add_argument("--hidden_size", type=int, default=128)
-    parser.add_argument("--num_layers", type=int, default=1)
-    parser.add_argument("--bidirectional", type=bool, default=False)
-    parser.add_argument("--dropout", type=float, default=0.0)
-    parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny")
-
+    parser = RaceDataModule.add_model_specific_args(parser)
+    parser = RaceRNNModule.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)
-    args = parser.parse_args()
-    args.gpus = '0'
+    args = parser.parse_args("--data_path data/RACE_processed \
+                              --batch_size 16 \
+                              --num_workers 0 \
+                              --hidden_size 128 \
+                              --learning_rate 1e-5 \
+                              --special_tokens [CON] [QUE] [ANS] [DIS] \
+                              --gpus 1 \
+                              --max_epochs 5 \
+                              --check_val_every_n_epoch 1".split())
 
-    # ------------
-    # data & model
-    # ------------
     fx_dm = RaceDataModule(args)
-    args.idx2w = {v: k for k, v in list(fx_dm.get_vocab().items())}
     fx_model = RaceRNNModule(args)
 
     # Callbacks:
@@ -67,13 +64,18 @@ if __name__ == "__main__":
     # Trainer:
     trainer = pl.Trainer.from_argparse_args(
         args,
-        max_epochs=1,
         checkpoint_callback=checkpoint,
         logger=logger
     )
     trainer.fit(fx_model, fx_dm)
 
-    # fx_infer = RaceRNNModule.load_from_checkpoint(checkpoint.best_model_path)
-    # fx_infer.eval()
-    # print(fx_infer)
-
+    fx_infer = RaceRNNModule.load_from_checkpoint(checkpoint.best_model_path)
+    vocab = {v:k for k,v in fx_dm.tokenizer.get_vocab().items()}
+    fx_infer.eval()
+    fx_dm.setup()
+    with torch.no_grad():
+      for batch in fx_dm.test_dataloader():
+        art, que, ans = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids']
+        x, y = torch.cat([ans, art], dim=1).long(), que.long()
+        out, _ = fx_infer(x)
+        translate(vocab,ans, out, y)

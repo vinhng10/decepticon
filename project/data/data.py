@@ -1,13 +1,50 @@
-
+import os
+import sys
 import re
+import glob
 import json
 from pathlib import Path
 from tqdm import tqdm
+from collections import Counter
+from functools import partial
+from argparse import ArgumentParser
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
+
+import nltk
+from nltk import sent_tokenize, word_tokenize
+nltk.download('punkt')
+
+
+def tokenize(st):
+    ans = []
+    for sent in sent_tokenize(st):
+        ans += word_tokenize(sent)
+    return " ".join(ans).lower()
+
+
+def count_question_type(questions):
+    question_types = ["what", "who", "where", "when", "why",
+                      "how", "which", "whose", "because", "mics"]
+    records = []
+    for question in tqdm(questions):
+        tokens = question.lower().split()
+        if any(set(tokens).intersection(set(question_types))):
+            t = set(tokens).intersection(set(question_types))
+            records.append(list(t)[0])
+        elif "_" in question:
+            records.append("cloze")
+        else:
+            records.append("mics")
+    counter = dict(Counter(records).most_common())
+    return counter
 
 
 def prepare_data(race, tokenizer):
@@ -27,6 +64,7 @@ def prepare_data(race, tokenizer):
 
 class RaceDataProcessor:
     """ Race Data Processor """
+
     def process_common(self, text):
         """ Preprocess text.
 
@@ -169,6 +207,7 @@ class RaceDataProcessor:
 
 class RaceDataset(Dataset):
     """ Race Dataset """
+
     def __init__(self, data_paths):
         """"""
         super().__init__()
@@ -200,20 +239,24 @@ class RaceDataset(Dataset):
 class RaceDataModule(LightningDataModule):
     """ Race Data Module """
 
-    def __init__(self, hparams):
+    @staticmethod
+    def add_model_specific_args(parent_parser):
         """"""
-        super().__init__()
-        if not hparams.is_preprocessed:
-            print("Data requires preprocessed...")
-            RaceDataProcessor().process_data(hparams.data_path, hparams.data_path+'_processed')
-            hparams.data_path = hparams.data_path+'_processed'
-        self.hparams = hparams
-        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--data_path", type=str,
+                            help="Path to data.")
+        parser.add_argument("--batch_size", type=int, default=256,
+                            help="Batch size.")
+        parser.add_argument("--num_workers", type=int, default=8,
+                            help="Number of workers for data loading.")
+        parser.add_argument("--special_tokens", nargs="*", default=["[CON]", "[QUE]", "[ANS]", "[DIS]"],
+                            help="Additional special tokens.")
+        parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny",
+                            help="Pretrained model.")
+        return parser
 
-    def get_vocab(self):
-        return self.tokenizer.get_vocab()
-
-    def collate_fn(self, batch):
+    @staticmethod
+    def default_collate_fn(batch, tokenizer):
         """"""
         articles = []
         questions = []
@@ -224,14 +267,27 @@ class RaceDataModule(LightningDataModule):
             articles.append(item["article"])
             questions.append(item["question"])
             answers.append(item["answer"])
-            distractors.append(self.tokenizer.sep_token.join(item["distractors"]))
+            distractors.append(tokenizer.additional_special_tokens[-1].join(item["distractors"]))
 
         return {
-            "articles": self.tokenizer(articles, padding=True, truncation=True, max_length=self.hparams.max_len_q, return_tensors="pt"),
-            "questions": self.tokenizer(questions, padding=True, return_tensors="pt"),
-            "answers": self.tokenizer(answers, padding=True, return_tensors="pt"),
-            "distractors": self.tokenizer(distractors, padding=True, return_tensors="pt"),
+            "articles": tokenizer(articles, padding=True, truncation=True, max_length=500, return_tensors="pt"),
+            "questions": tokenizer(questions, padding=True, return_tensors="pt"),
+            "answers": tokenizer(answers, padding=True, return_tensors="pt"),
+            "distractors": tokenizer(distractors, padding=True, return_tensors="pt"),
         }
+
+    def __init__(self, hparams, customed_collate_fn=None):
+        """"""
+        super().__init__()
+        self.hparams = hparams
+
+        if customed_collate_fn:
+            self.collate_fn = customed_collate_fn
+        else:
+            self.collate_fn = self.default_collate_fn
+
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
 
     def prepare_data(self):
         """"""
@@ -257,9 +313,8 @@ class RaceDataModule(LightningDataModule):
             shuffle=True,
             num_workers=self.hparams.num_workers,
             pin_memory=True,
-            collate_fn=self.collate_fn,
+            collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
-
         return self.train_loader
 
     def val_dataloader(self):
@@ -270,7 +325,7 @@ class RaceDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.hparams.num_workers,
             pin_memory=True,
-            collate_fn=self.collate_fn,
+            collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.val_loader
 
@@ -282,7 +337,7 @@ class RaceDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.hparams.num_workers,
             pin_memory=True,
-            collate_fn=self.collate_fn,
+            collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.test_loader
 
