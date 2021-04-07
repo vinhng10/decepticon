@@ -80,3 +80,11 @@ class T5FinetuneForRACE(pl.LightningModule):
 #             num_training_steps=self.hparams.num_training_steps)
  
         return [optimizer]#, [scheduler]
+    
+    def generate_batch(self, x):
+        return self.model.generate(input_ids = x.to(device), 
+                                     num_beams = 6,
+                                     num_return_sequences = 5,
+                                     max_length = 50,
+                                     no_repeat_ngram_size = 2,
+                                     early_stopping = True)
