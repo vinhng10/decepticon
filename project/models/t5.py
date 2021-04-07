@@ -30,9 +30,7 @@ class T5FinetuneForRACE(pl.LightningModule):
     
     def decode(self, sequence):
         return [self.tokenizer.decode(token) for token in sequence]
-    
-#     def generate(self,)
- 
+     
     def forward(self, ids, mask, labels):
         return self.model(input_ids = ids, attention_mask = mask, labels = labels)
 
@@ -47,10 +45,12 @@ class T5FinetuneForRACE(pl.LightningModule):
         self.logger.experiment.log_metric('train_loss', loss.detach())
         self.logger.experiment.log_metric('train_perplexity', torch.exp(loss.detach()))
         return loss
+    
     def on_test_epoch_end(self):
         logger.experiment.log_artifact('checkpoints/')
         
     def validation_step(self, batch, batch_idx):
+        """"""
         x, y = batch
         output = self(x["input_ids"], x["attention_mask"], self.mask_label_padding(y["input_ids"]))
         loss = output[0]
@@ -60,12 +60,14 @@ class T5FinetuneForRACE(pl.LightningModule):
         return loss
 
     def test_step(self, batch, batch_idx):
+        """"""
         x, y = batch
         output = self(x["input_ids"], x["attention_mask"], self.mask_label_padding(y["input_ids"]))
         loss = output[0]
         return loss
 
     def configure_optimizers(self):
+        """"""
         no_decay = ['bias', 'LayerNorm.weight']
         optimizer_grouped_parameters = [{'params': [p for n, p in self.named_parameters() if not any(nd in n for nd in no_decay)],
                                          'weight_decay': self.hparams.weight_decay}, 
@@ -81,10 +83,24 @@ class T5FinetuneForRACE(pl.LightningModule):
  
         return [optimizer]#, [scheduler]
     
-    def generate_batch(self, x):
-        return self.model.generate(input_ids = x.to(device), 
-                                     num_beams = 6,
-                                     num_return_sequences = 5,
-                                     max_length = 50,
-                                     no_repeat_ngram_size = 2,
-                                     early_stopping = True)
+    def generate_questions(self, context, decode = True):
+        """"""
+        NUM_RETURN_SEQ = 6
+        generated = self.model.generate(input_ids = context, # context -> answer + article
+                                        num_beams = 6,
+                                        num_return_sequences = NUM_RETURN_SEQ,
+                                        max_length = 50,
+                                        no_repeat_ngram_size = 2,
+                                        early_stopping = True)
+        
+        generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
+        
+        if decode:
+            output = self.datamodule.tokenizer.batch_decode(generated, 
+                                                            skip_special_tokens=True, 
+                                                            clean_up_tokenization_spaces=True) 
+            chunked_list = [output[i * NUM_RETURN_SEQ:(i + 1) * NUM_RETURN_SEQ] \
+                            for i in range((len(output) + NUM_RETURN_SEQ - 1) // NUM_RETURN_SEQ )] # chunk into [batch x NUM_RETURN]
+            return chunked_list
+        else:
+            return generated.view(context.shape[0], NUM_RETURN_SEQ, -1)
