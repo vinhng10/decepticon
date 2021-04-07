@@ -98,16 +98,19 @@ class RaceDataModule(LightningDataModule):
         for item in batch:
             context.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
             questions.append(item["question"])
-        context = tokenizer(context, padding=True, 
-                                               truncation=True, 
-                                               return_tensors="pt", 
-                                               pad_to_max_length=True, 
-                                               max_length=512)
-        questions = tokenizer(questions, padding=True, 
-                                               truncation=True, 
-                                               return_tensors="pt", 
-                                               pad_to_max_length=True, 
-                                               max_length=512)
+        context = tokenizer(text = context, 
+                            padding=True,
+                            truncation=True, 
+                            return_tensors="pt", 
+                            pad_to_max_length=True, 
+                            max_length=512)
+        questions = tokenizer(questions, 
+                              padding=True, 
+                              truncation=True, 
+                              return_tensors="pt", 
+                              pad_to_max_length=True, 
+                              max_length=512)
+        
         context['input_ids'] = torch.squeeze(context['input_ids'])
         context['attention_mask'] = torch.squeeze(context['attention_mask'])
         questions['input_ids'] = torch.squeeze(questions['input_ids'])
