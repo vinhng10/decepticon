@@ -14,6 +14,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from torch.utils.data import Dataset, DataLoader
+import torch
 from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
@@ -173,7 +174,7 @@ class RaceDataProcessor:
         save_path = Path(save_path)
 
         # Glob data paths:
-        paths = Path(data_path).glob("*/*/*")
+        paths = Path(data_path).glob("*/*/*.txt")
 
         # Process data:
         for path in tqdm(paths):
@@ -296,13 +297,16 @@ class RaceDataModule(LightningDataModule):
     def setup(self, stage=None):
         """"""
         # Prepare data paths:
-        train_paths = Path(self.hparams.data_path).glob("train/*/*")
-        val_paths = Path(self.hparams.data_path).glob("dev/*/*")
-        test_paths = Path(self.hparams.data_path).glob("test/*/*")
+        train_paths = Path(self.hparams.data_path).glob("train/*/*.txt")
+        val_paths = Path(self.hparams.data_path).glob("dev/*/*.txt")
+        test_paths = Path(self.hparams.data_path).glob("test/*/*.txt")
 
         # Prepare datasets
+        print("SETUP: Training Dataset")
         self.trainset = RaceDataset(train_paths)
+        print("SETUP: Validation Dataset")
         self.valset = RaceDataset(val_paths)
+        print("SETUP: Test Dataset")
         self.testset = RaceDataset(test_paths)
 
     def train_dataloader(self):
