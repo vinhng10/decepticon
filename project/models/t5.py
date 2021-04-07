@@ -83,14 +83,42 @@ class T5FinetuneForRACE(pl.LightningModule):
  
         return [optimizer]#, [scheduler]
     
-    def generate_questions(self, context, decode = True):
+    def generate_questions(self, context, decode: bool = True, num_return_sequences: int = 6,
+                           num_beams: int = 6, no_repeat_ngram_size: int = 2):
         """"""
-        NUM_RETURN_SEQ = 6
+        assert num_return_sequences <= num_beams, "Value is too large"
+        NUM_RETURN_SEQ = num_return_sequences
+        
         generated = self.model.generate(input_ids = context, # context -> answer + article
-                                        num_beams = 6,
+                                        num_beams = num_beams,
+                                        num_beam_groups = 2,
                                         num_return_sequences = NUM_RETURN_SEQ,
-                                        max_length = 50,
+                                        max_length = 30,
+                                        no_repeat_ngram_size =  no_repeat_ngram_size,
+                                        early_stopping = False)
+        
+        generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
+        
+        if decode:
+            output = self.datamodule.tokenizer.batch_decode(generated, 
+                                                            skip_special_tokens=True, 
+                                                            clean_up_tokenization_spaces=True) 
+            chunked_list = [output[i * NUM_RETURN_SEQ:(i + 1) * NUM_RETURN_SEQ] \
+                            for i in range((len(output) + NUM_RETURN_SEQ - 1) // NUM_RETURN_SEQ )] # chunk into [batch x NUM_RETURN]
+            return chunked_list
+        else:
+            return generated.view(context.shape[0], NUM_RETURN_SEQ, -1)
+        
+    def generate_top(self, context, decode: bool = True, num_return_sequences=5):
+        NUM_RETURN_SEQ = num_return_sequences
+        
+        generated = self.model.generate(input_ids = context, # context -> answer + article
+                                        num_beams = None,
+                                        num_return_sequences = NUM_RETURN_SEQ,
+                                        do_sample = True,
                                         no_repeat_ngram_size = 2,
+                                        top_k = 75,
+                                        top_p = 0.9, ## the more - the less diverse
                                         early_stopping = True)
         
         generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
@@ -104,3 +132,4 @@ class T5FinetuneForRACE(pl.LightningModule):
             return chunked_list
         else:
             return generated.view(context.shape[0], NUM_RETURN_SEQ, -1)
+        
