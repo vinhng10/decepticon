@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from tqdm import tqdm
 from collections import *
+from functools import partial
 from argparse import ArgumentParser
 
 import numpy as np
@@ -64,6 +65,7 @@ def prepare_data(race, tokenizer):
 
 class RaceDataProcessor:
     """ Race Data Processor """
+
     def process_common(self, text):
         """ Preprocess text.
 
@@ -206,6 +208,7 @@ class RaceDataProcessor:
 
 class RaceDataset(Dataset):
     """ Race Dataset """
+
     def __init__(self, data_paths):
         """"""
         super().__init__()
@@ -237,45 +240,55 @@ class RaceDataset(Dataset):
 class RaceDataModule(LightningDataModule):
     """ Race Data Module """
 
-    def __init__(self, hparams):
+    @staticmethod
+    def add_model_specific_args(parent_parser):
         """"""
-        super().__init__()
-        self.hparams = hparams
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
-        if self.hparams.pretrained_model in ["t5-base", "t5-small"]:
-            self.tokenizer.add_special_tokens({'additional_special_tokens': ['<answer>', '<context>']})
+        parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--data_path", type=str,
+                            help="Path to data.")
+        parser.add_argument("--batch_size", type=int, default=256,
+                            help="Batch size.")
+        parser.add_argument("--num_workers", type=int, default=8,
+                            help="Number of workers for data loading.")
+        parser.add_argument("--special_tokens", nargs="*", default=["[CON]", "[QUE]", "[ANS]", "[DIS]"],
+                            help="Additional special tokens.")
+        parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny",
+                            help="Pretrained model.")
+        return parser
 
-    def collate_fn(self, batch):
+    @staticmethod
+    def default_collate_fn(batch, tokenizer):
         """"""
         articles = []
         questions = []
         answers = []
         distractors = []
-        
-        #print("COLLATE based of %s" %self.hparams.pretrained_model)
-        if self.hparams.pretrained_model in ["t5-base", "t5-small"]:
-            for item in batch:
-                articles.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
-                questions.append(item["question"])
-            articles = self.tokenizer(articles, padding=True, 
-                                               truncation=True, 
-                                               return_tensors="pt", 
-                                               pad_to_max_length=True, 
-                                               max_length=512)
-            questions = self.tokenizer(questions, padding=True, 
-                                               truncation=True, 
-                                               return_tensors="pt", 
-                                               pad_to_max_length=True, 
-                                               max_length=512)
-            articles['input_ids'] = torch.squeeze(articles['input_ids'])
-            articles['attention_mask'] = torch.squeeze(articles['attention_mask'])
-            questions['input_ids'] = torch.squeeze(questions['input_ids'])
-            questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
 
-            return (articles, questions)
+        for item in batch:
+            articles.append(item["article"])
+            questions.append(item["question"])
+            answers.append(item["answer"])
+            distractors.append(tokenizer.additional_special_tokens[-1].join(item["distractors"]))
+
+        return {
+            "articles": tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
+            "questions": tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
+            "answers": tokenizer(answers, padding=True, truncation=True, return_tensors="pt"),
+            "distractors": tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
+        }
+
+    def __init__(self, hparams, customed_collate_fn=None):
+        """"""
+        super().__init__()
+        self.hparams = hparams
+
+        if customed_collate_fn:
+            self.collate_fn = customed_collate_fn
         else:
-            raise NotImplementedError
+            self.collate_fn = self.default_collate_fn
 
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
 
     def prepare_data(self):
         """"""
@@ -304,7 +317,7 @@ class RaceDataModule(LightningDataModule):
             shuffle=True,
             num_workers=self.hparams.num_workers,
             pin_memory=True,
-            collate_fn=self.collate_fn,
+            collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.train_loader
 
@@ -316,7 +329,7 @@ class RaceDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.hparams.num_workers,
             pin_memory=True,
-            collate_fn=self.collate_fn,
+            collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.val_loader
 
@@ -328,8 +341,7 @@ class RaceDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.hparams.num_workers,
             pin_memory=True,
-            collate_fn=self.collate_fn,
+            collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.test_loader
-
 
