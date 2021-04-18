@@ -31,6 +31,28 @@ def translate(vocab, ans, output, tgt):
     print("OUT:", out_str)
 
 
+def que_cat_dis_collate_fn(batch, tokenizer):
+    """"""
+    articles = []
+    questions = []
+    answers = []
+
+    for item in batch:
+        articles.append(item["article"])
+        questions.append(item["question"]+tokenizer.sep_token+tokenizer.additional_special_tokens[-1].join(item["distractors"]))
+        answers.append(item["answer"])
+
+    return {
+        "articles": tokenizer(articles, padding=True, truncation=True, max_length=500, return_tensors="pt"),
+        "questions": tokenizer(questions, padding=True, return_tensors="pt"),
+        "answers": tokenizer(answers, padding=True, return_tensors="pt"),
+    }
+
+def batch_fn4dis(batch):
+    art, que, ans, dis = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids'], batch["distractors"]['input_ids']
+    x, y = torch.cat([que, ans, art], dim=1).long(), dis.long()
+    return x, y
+
 if __name__ == "__main__":
     pl.seed_everything(1234)
 
@@ -49,7 +71,7 @@ if __name__ == "__main__":
                               --check_val_every_n_epoch 1".split())
 
     fx_dm = RaceDataModule(args)
-    fx_model = RaceRNNModule(args)
+    fx_model = RaceRNNModule(args, batch_fn4dis)
 
     # Callbacks:
     checkpoint = ModelCheckpoint(

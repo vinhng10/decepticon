@@ -37,11 +37,25 @@ class RaceRNNModule(pl.LightningModule):
                             help="The total number of training steps.")
         return parser
 
-    def __init__(self, hparams):
+    @staticmethod
+    def default_batch_fn(batch):
+        """
+        Description: from batch to x, y
+        """
+        art, que, ans = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids']
+        x, y = torch.cat([ans, art], dim=1).long(), que.long()
+        return x, y
+
+    def __init__(self, hparams, batch_fn=None):
         super(RaceRNNModule, self).__init__()
+
+        if batch_fn:
+            self.batch_fn = batch_fn
+        else:
+            self.batch_fn = self.default_batch_fn
+
         self.hparams = hparams
         self.save_hyperparameters(hparams)
-        print(self.hparams)
         # Encoder:
         num_directions = 2 if self.hparams.bidirectional else 1
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
@@ -140,8 +154,7 @@ class RaceRNNModule(pl.LightningModule):
         return {'optimizer': optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_loss'}
 
     def training_step(self, batch, batch_idx):
-        art, que, ans = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids']
-        x, y = torch.cat([ans, art], dim=1).long(), que.long()
+        x, y = self.batch_fn(batch)
         y_hat, _ = self(x, None, y, True)
         y_hat = y_hat.reshape(-1, y_hat.shape[-1])
         y = y.reshape(-1)
@@ -153,8 +166,7 @@ class RaceRNNModule(pl.LightningModule):
         self.log("loss", loss, logger=True)
 
     def validation_step(self, batch, batch_idx):
-        art, que, ans = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids']
-        x, y = torch.cat([ans, art], dim=1).long(), que.long()
+        x, y = self.batch_fn(batch)
         y_hat, _ = self(x, None, y, True)
         y_h_rs = y_hat.reshape(-1, y_hat.shape[-1])
         y_rs = y.reshape(-1)
