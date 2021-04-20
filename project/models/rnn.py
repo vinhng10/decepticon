@@ -9,15 +9,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.utils.data import Dataset, DataLoader
 
 # Pytorch Lightning Import:
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
 
 
-class RaceRNNModule(pl.LightningModule):
+class RaceModule(pl.LightningModule):
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -47,7 +44,10 @@ class RaceRNNModule(pl.LightningModule):
         return x, y
 
     def __init__(self, hparams, batch_fn=None):
-        super(RaceRNNModule, self).__init__()
+        """
+        :param batch_fn: function to process batch
+        """
+        super(RaceModule, self).__init__()
 
         if batch_fn:
             self.batch_fn = batch_fn
@@ -166,11 +166,7 @@ class RaceRNNModule(pl.LightningModule):
         self.log("loss", loss, logger=True)
 
     def validation_step(self, batch, batch_idx):
-        x, y = self.batch_fn(batch)
-        y_hat, _ = self(x, None, y, True)
-        y_h_rs = y_hat.reshape(-1, y_hat.shape[-1])
-        y_rs = y.reshape(-1)
-        val_loss = F.nll_loss(y_h_rs, y_rs, ignore_index=0)
+        val_loss = self.training_step(batch, batch_idx)["loss"]
         return {'val_loss': val_loss}
 
     def validation_epoch_end(self, outputs):
