@@ -238,7 +238,6 @@ class RaceDataset(Dataset):
 
 class RaceDataModule(LightningDataModule):
     """ Race Data Module """
-
     @staticmethod
     def add_model_specific_args(parent_parser):
         """"""
@@ -340,5 +339,4 @@ class RaceDataModule(LightningDataModule):
             collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.test_loader
-
 
