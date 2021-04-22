@@ -78,16 +78,15 @@ class RaceModule(pl.LightningModule):
         super(RaceModule, self).__init__()
         self.hparams = hparams
         self.save_hyperparameters(hparams)
+
         if batch_fn:
             self.batch_fn = batch_fn
         else:
             self.batch_fn = self.default_batch_fn
 
+        # Tokenizer:
         self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
         self.tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
-
-        # Tokenizer:
-        self.tokenizer = AutoTokenizer.from_pretrained(hparams.m_pretrained_model)
 
         # Metrics:
         self.metrics = Metrics()
@@ -118,10 +117,11 @@ class RaceModule(pl.LightningModule):
                 inputs dict: dict of input
                 memory_key_padding_mask: input padding mask
                 pred_len (int): Length of predicted sequence.
+
             Returns:
                 id_seqs (bsz, pred_len)
         """
-        target = torch.LongTensor([101] * self.hparams.batch_size).unsqueeze(1).to(inputs['input_ids'].device)
+        target = torch.LongTensor(self.tokenizer.cls_token * self.hparams.batch_size).unsqueeze(1).to(inputs['input_ids'].device)
         for i in range(pred_len):
             output = self.forward(inputs, target, memory_key_padding_mask=memory_key_padding_mask).permute((0, 2, 1))  # [bsz, seq_len, vsz]
             output = self.top_p_filtering(output[:, i:i + 1, :], top_p=self.hparams.top_p)
@@ -145,11 +145,10 @@ class RaceModule(pl.LightningModule):
                 else:
                     output: (seq_len, vocab_sz, batch)
         """
-        memory = self.encode(inputs)
         # Decode:
         decode = self.decoder(
             tgt=self.embedding(target).permute((1, 0, 2)),
-            memory=memory,
+            memory=self.encode(inputs),
             tgt_mask=self.generate_tgt_mask(target.shape[1]).to(target.device),
             tgt_key_padding_mask=target_key_padding_mask,
             memory_key_padding_mask=memory_key_padding_mask
@@ -211,21 +210,21 @@ class RaceModule(pl.LightningModule):
         # Prepare data:
         inputs, targets = batch["inputs"], batch["targets"]
 
-        # Forward pass:
-        generated = self(
-            target=targets["input_ids"][:, :-1],
-            memory=self.encode(inputs),
-            input_key_padding_mask=targets["attention_mask"][:, :-1] == 0,
+        # Generations:
+        generations = self.generate(
+            inputs=inputs,
+            pred_len=64,
             memory_key_padding_mask=inputs["attention_mask"] == 0
         )
 
         predictions = [
-            generated[for this]
+            self.tokenizer.decode(generation, skip_special_tokens=True)
+            for generation in generations
         ]
 
         references = [
             self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in targets["input_ids"][:, 1:]
+            for target in targets["input_ids"]
         ]
 
         # Compute metrics:
