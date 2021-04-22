@@ -130,6 +130,15 @@ class RaceModule(pl.LightningModule):
         hidden = hidden.permute(2, 0, 1)
         return outputs, hidden.contiguous()
 
+    def generate(self, x, pred_len):
+        """ Args:
+                x (batch, seq_len): Input sequence.
+                pred_len (int): Length of predicted sequence.
+            Returns:
+                outputs (batch, pred_len)
+        """
+        return self(x, pred_len)
+
     def forward(self, x, pred_len=32, target=None, teacher_forcing=False):
         """ Args:
                 x (batch, seq_len): Input sequence.
@@ -157,6 +166,7 @@ class RaceModule(pl.LightningModule):
         x = torch.zeros((batch, 1), device=hidden.device).long()
         # Sequence to record the predicted values:
         outputs = list()
+        ids = list()
         for i in range(pred_len):
             # Embed the value at ith time step:
             x = self.embedding(x)
@@ -172,10 +182,11 @@ class RaceModule(pl.LightningModule):
                 output = self.top_p_filtering(output, top_p=self.hparams.top_p)
                 prob = F.softmax(output, dim=2).squeeze(1)
                 x = torch.multinomial(prob, 1)
-                # x = torch.argmax(output, dim=2)
-        # Concatenate predicted values:
-        outputs = torch.cat(outputs, dim=1)
-        return outputs, hidden
+                ids.append(x)
+        if not teacher_forcing:
+            return torch.cat(ids, dim=1)
+        else:
+            return torch.cat(outputs, dim=1), hidden
 
     def configure_optimizers(self):
         optimizer = Adam(self.parameters(), lr=self.hparams.learning_rate)
