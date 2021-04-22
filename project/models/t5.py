@@ -77,14 +77,14 @@ class T5FinetuneForRACE(pl.LightningModule):
                                         {'params': [p for n, p in self.named_parameters() if any(nd in n for nd in no_decay)],
                                          'weight_decay': 0.0})
         
-        optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr = min(1e-2, self.learning_rate))
+        optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr = min(1e-4, self.learning_rate))
 #         scheduler = get_linear_schedule_with_warmup(
 #             optimizer,
-#             num_warmup_steps=0,
+#             num_warmup_steps=100,
 #             # Default value in run_glue.py
-#             num_training_steps=self.hparams.num_training_steps)
+#             num_training_steps=50000)
  
-        return optimizer#, [scheduler]
+        return optimizer#, scheduler
     
     def generate_questions(self, context, decode: bool = True, num_return_sequences: int = 6,
                            num_beams: int = 6, no_repeat_ngram_size: int = 2):
