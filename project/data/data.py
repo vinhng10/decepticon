@@ -117,6 +117,35 @@ class RaceDataModule(LightningDataModule):
         questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
         return (context, questions)
         
+    def distractor_collate_fn(batch, tokenizer):
+        """"""
+        context = []
+        distractor = []
+        for item in batch:
+            context.append(" ".join(["<answer>", item["answer"], "<question>", item["question"], "<context>", item["article"]]))
+            indx = np.random.randint(low = 0, high = len(item["distractors"]), size = 1)[0]
+            #print(item["distractors"])
+            distractor.append(item["distractors"][indx])
+            
+        context = tokenizer(text = context, 
+                            padding=True,
+                            truncation=True, 
+                            return_tensors="pt", 
+                            pad_to_max_length=True, 
+                            max_length=512)
+        
+        distractor = tokenizer(distractor, 
+                              padding=True, 
+                              truncation=True, 
+                              return_tensors="pt", 
+                              pad_to_max_length=True, 
+                              max_length=512)
+        
+        context['input_ids'] = torch.squeeze(context['input_ids'])
+        context['attention_mask'] = torch.squeeze(context['attention_mask'])
+        distractor['input_ids'] = torch.squeeze(distractor['input_ids'])
+        distractor['attention_mask'] = torch.squeeze(distractor['attention_mask'])
+        return (context, distractor)
 
     def __init__(self, hparams, custom_collate_fn=None):
         """"""
