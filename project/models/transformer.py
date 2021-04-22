@@ -231,6 +231,9 @@ class RaceModule(pl.LightningModule):
         inputs = Input(predictions=predictions, references=references)
         metrics = self.metrics.compute_metrics(inputs)
 
+        # Log:
+        self.log_dict(metrics)
+
         return metrics
 
 
