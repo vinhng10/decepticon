@@ -30,6 +30,7 @@ class RaceModule(pl.LightningModule):
                             help="Number of sub-layers in the decoder.")
         parser.add_argument("--learning_rate", type=float, default=1e-3,
                             help="Learning rate.")
+        parser.add_argument("--top_p", type=float, default=0.5)
         parser.add_argument("--num_warmup_steps", type=int, default=0,
                             help="The number of steps for the warmup phase.")
         parser.add_argument("--num_training_steps", type=int, default=1000,
@@ -40,6 +41,28 @@ class RaceModule(pl.LightningModule):
     def default_batch_fn(batch):
         x, y = batch['inputs'], batch['targets'],
         return x, y
+
+    @staticmethod
+    def top_p_filtering(score, top_p):
+        """ Args:
+                score (bsz, vocab_size): output of the last layer
+                top_p float value: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
+            Returns:
+                score (bsz, vocab_size): output after redistributing the prob with top-p
+        """
+        sorted_logits, sorted_indices = torch.sort(score, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above the threshold
+        sorted_indices_to_remove = cumulative_probs >= top_p
+        # Shift the indices to the right to keep also the first token above the threshold
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+
+        indices_to_remove = torch.zeros_like(sorted_indices_to_remove, dtype=sorted_indices_to_remove.dtype).scatter_(
+            dim=-1, index=sorted_indices, src=sorted_indices_to_remove)
+        score[indices_to_remove] = -float('Inf')
+        return score
 
     @staticmethod
     def generate_tgt_mask(size):
@@ -57,8 +80,8 @@ class RaceModule(pl.LightningModule):
         else:
             self.batch_fn = self.default_batch_fn
 
-        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
-        self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
 
         # Encoder:
         self.encoder = AutoModel.from_pretrained(self.hparams.pretrained_model)
@@ -98,6 +121,7 @@ class RaceModule(pl.LightningModule):
         """
         memory = self.encode(inputs)
         if pred_len:
+            # [CLS]
             target = torch.LongTensor([101]*self.hparams.batch_size).unsqueeze(1).to(memory.device)
             for i in range(pred_len):
                 decode = self.decoder(
@@ -107,8 +131,11 @@ class RaceModule(pl.LightningModule):
                 )
 
                 # Head:
-                output = self.head(decode).permute((1, 2, 0))
-                token = torch.argmax(output[:, :, i:i+1], dim=1)
+                output = self.head(decode).permute((1, 0, 2)) # [bsz, seq_len, vsz]
+                output = self.top_p_filtering(output[:, i:i+1, :], top_p=self.hparams.top_p)
+                prob = F.softmax(output, dim=2).squeeze(1)
+                token = torch.multinomial(prob, 1)
+                # token = torch.argmax(output[:, :, i:i+1], dim=1) # [bsz, 1]
                 target = torch.cat([target, token], dim=1)
             return target
 

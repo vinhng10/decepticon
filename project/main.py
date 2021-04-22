@@ -12,7 +12,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from data.data import RaceDataModule
 
 
-def translate(vocab, ans, output, tgt):
+def translate(tokenizer, ans, output, tgt):
     """
     Args:
         vocab dictionary of [index, word]
@@ -27,9 +27,9 @@ def translate(vocab, ans, output, tgt):
       output = np.argmax(output, axis=1)
     else:
       output = output[0, :].long().numpy()
-    ans_str = ' '.join([vocab[i] for i in ans if i != 0])
-    tgt_str = ' '.join([vocab[i] for i in tgt if i != 0])
-    out_str = ' '.join([vocab[i] for i in output if i != 0])
+    ans_str = ' '.join(tokenizer.convert_ids_to_tokens(ans, True))
+    tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt, True))
+    out_str = ' '.join(tokenizer.convert_ids_to_tokens(output, True))
     print("\n============================")
     print("ANS:", ans_str)
     print("TGT:", tgt_str)
@@ -72,11 +72,13 @@ def rnn_dis_batch_fn(batch):
 
 
 if __name__ == "__main__":
+    # TODO Merge t5
+
     # Choose the model
     # from models.transformer import RaceModule
     from models.rnn import RaceModule
 
-    batch_fn = rnn_batch_fn
+    batch_fn = None
     collate_fn = None
 
     pl.seed_everything(1234)
@@ -86,28 +88,29 @@ if __name__ == "__main__":
     parser = RaceModule.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)
     args = parser.parse_args("--data_path data/RACE_processed \
-                              --batch_size 16 \
+                              --batch_size 32 \
                               --num_workers 0 \
+                              --top_p 0.3 \
                               --hidden_size 128 \
                               --learning_rate 1e-5 \
                               --special_tokens [CON] [QUE] [ANS] [DIS] \
                               --gpus 1 \
-                              --max_epochs 5 \
+                              --max_epochs 1 \
                               --check_val_every_n_epoch 1".split())
     """
     "--data_path data/RACE_processed \
                               --d_model 128 \
                               --nhead 8 \
-                              --batch_size 64 \
+                              --batch_size 1 \
                               --num_workers 0 \
                               --num_layers 1 \
+                              --top_p 0.5 \
                               --learning_rate 1e-5 \
                               --special_tokens [CON] [QUE] [ANS] [DIS] \
                               --pretrained_model prajjwal1/bert-tiny \
                               --gpus 1 \
                               --max_epochs 1 \
                               --check_val_every_n_epoch 1".split()
-
     """
 
     fx_dm = RaceDataModule(args, collate_fn)
@@ -132,16 +135,18 @@ if __name__ == "__main__":
     trainer.fit(fx_model, fx_dm)
 
     fx_infer = RaceModule.load_from_checkpoint(checkpoint.best_model_path)
-    vocab = {v:k for k,v in fx_dm.tokenizer.get_vocab().items()}
     fx_infer.eval()
     fx_dm.setup()
+
     with torch.no_grad():
         for batch in fx_dm.test_dataloader():
-            ans = batch['inputs']['input_ids']
+            # ans = batch['inputs']['input_ids']
+            ans = batch['answers']['input_ids']
             if batch_fn:
                 x, y = batch_fn(batch)
             else:
                 x, y = fx_infer.batch_fn(batch)
             # out = fx_infer(x, pred_len=50)
             out, _ = fx_infer(x)
-            translate(vocab, ans, out, y['input_ids'])
+            # translate(fx_dm.tokenizer, ans, out, y['input_ids'])
+            translate(fx_dm.tokenizer, ans, out, y)

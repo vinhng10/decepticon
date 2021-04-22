@@ -1,5 +1,4 @@
 # Python Import:
-import numpy as np
 from argparse import ArgumentParser
 from transformers import AutoTokenizer
 
@@ -23,6 +22,7 @@ class RaceModule(pl.LightningModule):
         parser.add_argument("--embed_dim", type=int, default=256)
         parser.add_argument("--bidirectional", type=bool, default=False)
         parser.add_argument("--dropout", type=float, default=0)
+        parser.add_argument("--top_p", type=float, default=0.5)
         parser.add_argument("--hidden_size", type=int, default=256,
                             help="hidden_sz of the GRU")
         parser.add_argument("--num_layers", type=int, default=1,
@@ -42,6 +42,28 @@ class RaceModule(pl.LightningModule):
         art, que, ans = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids']
         x, y = torch.cat([ans, art], dim=1).long(), que.long()
         return x, y
+
+    @staticmethod
+    def top_p_filtering(score, top_p):
+        """ Args:
+                score (bsz, vocab_size): output of the last layer
+                top_p float value: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
+            Returns:
+                score (bsz, vocab_size): output after redistributing the prob with top-p
+        """
+        sorted_logits, sorted_indices = torch.sort(score, descending=True)
+        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+
+        # Remove tokens with cumulative probability above the threshold
+        sorted_indices_to_remove = cumulative_probs >= top_p
+        # Shift the indices to the right to keep also the first token above the threshold
+        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+        sorted_indices_to_remove[..., 0] = 0
+
+        indices_to_remove = torch.zeros_like(sorted_indices_to_remove, dtype=sorted_indices_to_remove.dtype).scatter_(
+            dim=-1, index=sorted_indices, src=sorted_indices_to_remove)
+        score[indices_to_remove] = -float('Inf')
+        return score
 
     def __init__(self, hparams, batch_fn=None):
         """
@@ -136,14 +158,18 @@ class RaceModule(pl.LightningModule):
             # Embed the value at ith time step:
             x = self.embedding(x)
             output, hidden = self.de_gru(x, hidden)
-            output = F.log_softmax(self.de_fc(output),dim=2)
-            outputs.append(output)
+            output = self.de_fc(output)
+            output_ls = F.log_softmax(output,dim=2)
+            outputs.append(output_ls)
             # If teacher_forcing then use the target value at current step
             # Else use the predicted value at previous step:
             if teacher_forcing:
                 x = target[:, i:i+1]
             else:
-                x = torch.argmax(output, dim=2)
+                output = self.top_p_filtering(output, top_p=self.hparams.top_p)
+                prob = F.softmax(output, dim=2).squeeze(1)
+                x = torch.multinomial(prob, 1)
+                # x = torch.argmax(output, dim=2)
         # Concatenate predicted values:
         outputs = torch.cat(outputs, dim=1)
         return outputs, hidden
