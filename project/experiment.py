@@ -20,7 +20,7 @@ def main(hparams):
     #hparams.tokenizer_len = len(data_module.tokenizer)
     early_stop_callback = EarlyStopping(
         monitor='val_perplexity',
-        min_delta=0.01,
+        min_delta=0.1,
         patience=3,
         verbose=False,
         mode="min")
@@ -43,13 +43,14 @@ def main(hparams):
                       logger = logger,
                       terminate_on_nan = hparams.terminate_on_nan,
                       benchmark = True,
+                      pl_optimizer = True,
                       precision = 16,
                       #log_gpy_memory = True,
                       track_grad_norm = 2,
-                      max_epochs = 10,
+                      max_epochs = 20,
                       log_every_n_steps = 150,
                       gradient_clip_val = 5,
-                      #stochastic_weight_avg = True,
+                      stochastic_weight_avg = True,
                       gpus=-1)
     trainer.fit(model, data)
     
