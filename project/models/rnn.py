@@ -81,11 +81,17 @@ class RaceModule(pl.LightningModule):
 
         self.hparams = hparams
         self.save_hyperparameters(hparams)
+
+        # Tokenizer:
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+
+        # Metrics:
+        self.metrics = Metrics()
+
         # Encoder:
         num_directions = 2 if self.hparams.bidirectional else 1
-        tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
-        tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
-        vocab_size = tokenizer.vocab_size + len(self.hparams.special_tokens)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
+        vocab_size = self.tokenizer.vocab_size + len(self.hparams.special_tokens)
         self.embedding = nn.Embedding(vocab_size + 1, self.hparams.embed_dim)
         self.en_gru = nn.GRU(
             self.hparams.embed_dim,
@@ -134,6 +140,7 @@ class RaceModule(pl.LightningModule):
         """ Args:
                 x (batch, seq_len): Input sequence.
                 pred_len (int): Length of predicted sequence.
+
             Returns:
                 outputs (batch, pred_len)
         """
@@ -217,24 +224,20 @@ class RaceModule(pl.LightningModule):
         # Prepare data:
         inputs, targets = self.batch_fn(batch)
 
-        # Forward pass:
-        generated = self(
-            target=targets["input_ids"][:, :-1],
-            memory=self.encode(inputs),
-            input_key_padding_mask=targets["attention_mask"][:, :-1] == 0,
-            memory_key_padding_mask=inputs["attention_mask"] == 0
-        )
+        # Generations:
+        generations = self.generate(inputs, pred_len=64)
 
+        # Compute metrics:
         predictions = [
-            generated[for this]
+            self.tokenizer.decode(generation, skip_special_tokens=True)
+            for generation in generations
         ]
 
         references = [
             self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in targets["input_ids"][:, 1:]
+            for target in targets
         ]
 
-        # Compute metrics:
         inputs = Input(predictions=predictions, references=references)
         metrics = self.metrics.compute_metrics(inputs)
 
