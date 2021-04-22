@@ -5,7 +5,7 @@ import glob
 import json
 from pathlib import Path
 from tqdm import tqdm
-from collections import *
+from collections import Counter
 from functools import partial
 from argparse import ArgumentParser
 
@@ -18,6 +18,194 @@ import torch
 from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
+
+<<<<<<< HEAD
+=======
+import nltk
+from nltk import sent_tokenize, word_tokenize
+nltk.download('punkt')
+
+
+def tokenize(st):
+    ans = []
+    for sent in sent_tokenize(st):
+        ans += word_tokenize(sent)
+    return " ".join(ans).lower()
+
+
+def count_question_type(questions):
+    question_types = ["what", "who", "where", "when", "why",
+                      "how", "which", "whose", "because", "mics"]
+    records = []
+    for question in tqdm(questions):
+        tokens = question.lower().split()
+        if any(set(tokens).intersection(set(question_types))):
+            t = set(tokens).intersection(set(question_types))
+            records.append(list(t)[0])
+        elif "_" in question:
+            records.append("cloze")
+        else:
+            records.append("mics")
+    counter = dict(Counter(records).most_common())
+    return counter
+
+
+def prepare_data(race, tokenizer):
+    paths = race["middle"] + race["high"]
+    inputs = []
+    outputs = []
+    for path in paths:
+        with open(path) as f:
+            data = json.load(f)
+        article = data["article"]
+        for question, answer, options in zip(data["questions"], data["answers"], data["options"]):
+            correct_option = options.pop(ord(answer) - ord("A"))
+            inputs.append(" [SEP] ".join([article, correct_option]))
+            outputs.append(" [SEP] ".join([question, *options]))
+    return inputs, outputs
+
+
+class RaceDataProcessor:
+    """ Race Data Processor """
+
+    def process_common(self, text):
+        """ Preprocess text.
+
+        Parameters
+        ----------
+        text: str
+            Text to be processed.
+
+        Returns
+        -------
+        text: str
+            Processed text.
+        """
+        # Replace "`" with "'":
+        text = text.replace("`", "'")
+        # Remove "s6t----":
+        text = text.replace("s6t----", "")
+        # Remove [...]:
+        text = "".join(re.split(r"\[+.*\]*", text))
+        return text
+
+    def process_question(self, question):
+        """ Preprocess question.
+
+        Parameters
+        ----------
+        question: str
+            Question to be processed.
+
+        Returns
+        -------
+        question: str
+            Processed question.
+        """
+        # Common process:
+        question = self.process_common(question)
+        # Remove question number and "." at the start
+        question = "".join(re.split(r"\A\d*\. *", question))
+        # Remove redundant duplicate of "-----":
+        question = " ".join(re.split(r"--+", question))
+        # Remove redundant whitespace:
+        question = " ".join(question.split())
+        return question
+
+    def process_options(self, options):
+        """ Preprocess options.
+
+        Parameters
+        ----------
+        options: list of str
+            Options to be processed.
+
+        Returns
+        -------
+        options: list of str
+            Processed options.
+        """
+        for i in range(len(options)):
+            # Remove redundant whitespace:
+            options[i] = self.process_common(options[i])
+            # Remove redundant whitespace:
+            options[i] = " ".join(options[i].split())
+        return options
+
+    def process_article(self, article):
+        """ Preprocess article.
+
+        Parameters
+        ----------
+        article: str
+            Article to be processed.
+
+        Returns
+        -------
+        article: str
+            Processed article.
+        """
+        # Common process:
+        article = self.process_common(article)
+        # Replace redundant duplicate of "-----" with "--":
+        article = re.sub(r"--+", "--", article)
+        # Remove redundant whitespace:
+        article = " ".join(article.split())
+        return article
+
+    def process_data(self, data_path, save_path):
+        """ Preprocess data.
+
+        The function will perform preprocessing on all files in the directory
+        given in the "data_path". The processed data will be saved to the
+        directory given in the "save_path". The directory structure of the
+        processed files will be the same as that of the raw data files.
+
+        Parameters
+        ----------
+        data_path: str
+            Path to raw data directory.
+        save_path: str
+            Path to directory to save processed data.
+
+        Returns
+        -------
+        None
+        """
+        # Prepare path for saving processed data:
+        save_path = Path(save_path)
+
+        # Glob data paths:
+        paths = Path(data_path).glob("*/*/*")
+
+        # Process data:
+        for path in tqdm(paths):
+            # Read data:
+            with open(path) as f:
+                data = json.load(f)
+
+            # Process article:
+            data["article"] = self.process_article(data["article"])
+
+            # Process questions and options:
+            for i in range(len(data["questions"])):
+                data["questions"][i] = self.process_question(data["questions"][i])
+                data["options"][i] = self.process_options(data["options"][i])
+
+            # Create new file to save processed data:
+            dataset = path.parent.parent.stem
+            level = path.parent.stem
+            name = path.name
+            parent_path = save_path / dataset / level
+            parent_path.mkdir(parents=True, exist_ok=True)
+            dump_path = parent_path / name
+            dump_path.touch(exist_ok=True)
+
+            # Dump processed data to save path:
+            with open(dump_path, "w") as f:
+                json.dump(data, f)
+
+        print("Preprocess data successfully!")
 
 
 class RaceDataset(Dataset):
@@ -85,11 +273,12 @@ class RaceDataModule(LightningDataModule):
             distractors.append(tokenizer.additional_special_tokens[-1].join(item["distractors"]))
 
         return {
-            "articles": tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
-            "questions": tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
-            "answers": tokenizer(answers, padding=True, truncation=True, return_tensors="pt"),
-            "distractors": tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
+            "articles": tokenizer(articles, padding=True, truncation=True, max_length=500, return_tensors="pt"),
+            "questions": tokenizer(questions, padding=True, return_tensors="pt"),
+            "answers": tokenizer(answers, padding=True, return_tensors="pt"),
+            "distractors": tokenizer(distractors, padding=True, return_tensors="pt"),
         }
+
     @staticmethod
     def t5_collate_fn(batch, tokenizer):
         """"""
@@ -98,49 +287,49 @@ class RaceDataModule(LightningDataModule):
         for item in batch:
             context.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
             questions.append(item["question"])
-        context = tokenizer(text = context, 
+        context = tokenizer(text=context,
                             padding=True,
-                            truncation=True, 
-                            return_tensors="pt", 
-                            pad_to_max_length=True, 
+                            truncation=True,
+                            return_tensors="pt",
+                            pad_to_max_length=True,
                             max_length=512)
-        questions = tokenizer(questions, 
-                              padding=True, 
-                              truncation=True, 
-                              return_tensors="pt", 
-                              pad_to_max_length=True, 
+        questions = tokenizer(questions,
+                              padding=True,
+                              truncation=True,
+                              return_tensors="pt",
+                              pad_to_max_length=True,
                               max_length=512)
-        
+
         context['input_ids'] = torch.squeeze(context['input_ids'])
         context['attention_mask'] = torch.squeeze(context['attention_mask'])
         questions['input_ids'] = torch.squeeze(questions['input_ids'])
         questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
         return (context, questions)
-        
+
     def distractor_collate_fn(batch, tokenizer):
         """"""
         context = []
         distractor = []
         for item in batch:
             context.append(" ".join(["<answer>", item["answer"], "<question>", item["question"], "<context>", item["article"]]))
-            indx = np.random.randint(low = 0, high = len(item["distractors"]), size = 1)[0]
-            #print(item["distractors"])
+            indx = np.random.randint(low=0, high=len(item["distractors"]), size=1)[0]
+            # print(item["distractors"])
             distractor.append(item["distractors"][indx])
-            
-        context = tokenizer(text = context, 
+
+        context = tokenizer(text=context,
                             padding=True,
-                            truncation=True, 
-                            return_tensors="pt", 
-                            pad_to_max_length=True, 
+                            truncation=True,
+                            return_tensors="pt",
+                            pad_to_max_length=True,
                             max_length=512)
-        
-        distractor = tokenizer(distractor, 
-                              padding=True, 
-                              truncation=True, 
-                              return_tensors="pt", 
-                              pad_to_max_length=True, 
-                              max_length=512)
-        
+
+        distractor = tokenizer(distractor,
+                               padding=True,
+                               truncation=True,
+                               return_tensors="pt",
+                               pad_to_max_length=True,
+                               max_length=512)
+
         context['input_ids'] = torch.squeeze(context['input_ids'])
         context['attention_mask'] = torch.squeeze(context['attention_mask'])
         distractor['input_ids'] = torch.squeeze(distractor['input_ids'])
@@ -155,6 +344,19 @@ class RaceDataModule(LightningDataModule):
         if custom_collate_fn:
             print("DataModule: Custom collate function is detected")
             self.collate_fn = custom_collate_fn
+        else:
+            self.collate_fn = self.default_collate_fn
+
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
+
+    def __init__(self, hparams, customed_collate_fn=None):
+        """"""
+        super().__init__()
+        self.hparams = hparams
+
+        if customed_collate_fn is not None:
+            self.collate_fn = customed_collate_fn
         else:
             self.collate_fn = self.default_collate_fn
 
