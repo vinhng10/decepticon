@@ -281,7 +281,7 @@ class RaceDataModule(LightningDataModule):
         super().__init__()
         self.hparams = hparams
 
-        if customed_collate_fn:
+        if customed_collate_fn is not None:
             self.collate_fn = customed_collate_fn
         else:
             self.collate_fn = self.default_collate_fn
