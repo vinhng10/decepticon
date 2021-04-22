@@ -12,6 +12,9 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 # Pytorch Lightning Import:
 import pytorch_lightning as pl
 
+# Internal Import:
+from project.metrics.metrics import Input, Metrics
+
 
 class RaceModule(pl.LightningModule):
 
@@ -78,11 +81,17 @@ class RaceModule(pl.LightningModule):
 
         self.hparams = hparams
         self.save_hyperparameters(hparams)
+
+        # Tokenizer:
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+
+        # Metrics:
+        self.metrics = Metrics()
+
         # Encoder:
         num_directions = 2 if self.hparams.bidirectional else 1
-        tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
-        tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
-        vocab_size = tokenizer.vocab_size + len(self.hparams.special_tokens)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
+        vocab_size = self.tokenizer.vocab_size + len(self.hparams.special_tokens)
         self.embedding = nn.Embedding(vocab_size + 1, self.hparams.embed_dim)
         self.en_gru = nn.GRU(
             self.hparams.embed_dim,
@@ -131,6 +140,7 @@ class RaceModule(pl.LightningModule):
         """ Args:
                 x (batch, seq_len): Input sequence.
                 pred_len (int): Length of predicted sequence.
+
             Returns:
                 outputs (batch, pred_len)
         """
@@ -209,3 +219,26 @@ class RaceModule(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         self.log("val_loss", val_loss, prog_bar=True, logger=True)
+
+    def test_step(self, batch, batch_idx):
+        # Prepare data:
+        inputs, targets = self.batch_fn(batch)
+
+        # Generations:
+        generations = self.generate(inputs, pred_len=64)
+
+        # Compute metrics:
+        predictions = [
+            self.tokenizer.decode(generation, skip_special_tokens=True)
+            for generation in generations
+        ]
+
+        references = [
+            self.tokenizer.decode(target, skip_special_tokens=True)
+            for target in targets
+        ]
+
+        inputs = Input(predictions=predictions, references=references)
+        metrics = self.metrics.compute_metrics(inputs)
+
+        return metrics

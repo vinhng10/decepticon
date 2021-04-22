@@ -14,6 +14,9 @@ from transformers import AdamW
 from transformers import AutoTokenizer, AutoModel
 from transformers import get_linear_schedule_with_warmup
 
+# Internal Import:
+from project.metrics.metrics import Input, Metrics
+
 
 class RaceModule(pl.LightningModule):
     """ Race Module """
@@ -82,6 +85,12 @@ class RaceModule(pl.LightningModule):
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
         self.tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
+
+        # Tokenizer:
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.m_pretrained_model)
+
+        # Metrics:
+        self.metrics = Metrics()
 
         # Encoder:
         self.encoder = AutoModel.from_pretrained(self.hparams.pretrained_model)
@@ -197,3 +206,32 @@ class RaceModule(pl.LightningModule):
         """"""
         val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         self.log("val_loss", val_loss, prog_bar=True, logger=True)
+
+    def test_step(self, batch, batch_idx):
+        # Prepare data:
+        inputs, targets = batch["inputs"], batch["targets"]
+
+        # Forward pass:
+        generated = self(
+            target=targets["input_ids"][:, :-1],
+            memory=self.encode(inputs),
+            input_key_padding_mask=targets["attention_mask"][:, :-1] == 0,
+            memory_key_padding_mask=inputs["attention_mask"] == 0
+        )
+
+        predictions = [
+            generated[for this]
+        ]
+
+        references = [
+            self.tokenizer.decode(target, skip_special_tokens=True)
+            for target in targets["input_ids"][:, 1:]
+        ]
+
+        # Compute metrics:
+        inputs = Input(predictions=predictions, references=references)
+        metrics = self.metrics.compute_metrics(inputs)
+
+        return metrics
+
+
