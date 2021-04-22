@@ -251,7 +251,7 @@ class RaceDataModule(LightningDataModule):
                             help="Number of workers for data loading.")
         parser.add_argument("--special_tokens", nargs="*", default=["[CON]", "[QUE]", "[ANS]", "[DIS]"],
                             help="Additional special tokens.")
-        parser.add_argument("--dm_pretrained_model", type=str, default="prajjwal1/bert-tiny",
+        parser.add_argument("--pretrained_model", type=str, default="prajjwal1/bert-tiny",
                             help="Pretrained model.")
         return parser
 
@@ -270,10 +270,10 @@ class RaceDataModule(LightningDataModule):
             distractors.append(tokenizer.additional_special_tokens[-1].join(item["distractors"]))
 
         return {
-            "articles": tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
-            "questions": tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
-            "answers": tokenizer(answers, padding=True, truncation=True, return_tensors="pt"),
-            "distractors": tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
+            "articles": tokenizer(articles, padding=True, truncation=True, max_length=500, return_tensors="pt"),
+            "questions": tokenizer(questions, padding=True, return_tensors="pt"),
+            "answers": tokenizer(answers, padding=True, return_tensors="pt"),
+            "distractors": tokenizer(distractors, padding=True, return_tensors="pt"),
         }
 
     def __init__(self, hparams, customed_collate_fn=None):
@@ -286,7 +286,7 @@ class RaceDataModule(LightningDataModule):
         else:
             self.collate_fn = self.default_collate_fn
 
-        self.tokenizer = AutoTokenizer.from_pretrained(hparams.dm_pretrained_model)
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
         self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
 
     def prepare_data(self):
