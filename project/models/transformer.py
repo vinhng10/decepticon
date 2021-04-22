@@ -104,6 +104,23 @@ class RaceModule(pl.LightningModule):
         memory = self.encoder(**input).last_hidden_state.permute((1, 0, 2))
         return memory
 
+    def generate(self, inputs, pred_len, memory_key_padding_mask=None):
+        """ Args:
+                inputs dict: dict of input
+                memory_key_padding_mask: input padding mask
+                pred_len (int): Length of predicted sequence.
+            Returns:
+                id_seqs (bsz, pred_len)
+        """
+        target = torch.LongTensor([101] * self.hparams.batch_size).unsqueeze(1).to(inputs['input_ids'].device)
+        for i in range(pred_len):
+            output = self.forward(inputs, target, memory_key_padding_mask=memory_key_padding_mask).permute((0, 2, 1))  # [bsz, seq_len, vsz]
+            output = self.top_p_filtering(output[:, i:i + 1, :], top_p=self.hparams.top_p)
+            prob = F.softmax(output, dim=2).squeeze(1)
+            token = torch.multinomial(prob, 1)
+            target = torch.cat([target, token], dim=1)
+        return target
+
     def forward(self, inputs, target=None, target_key_padding_mask=None, memory_key_padding_mask=None, pred_len=None):
         """ Args:
                 inputs dict: dict of input
@@ -120,25 +137,6 @@ class RaceModule(pl.LightningModule):
                     output: (seq_len, vocab_sz, batch)
         """
         memory = self.encode(inputs)
-        if pred_len:
-            # [CLS]
-            target = torch.LongTensor([101]*self.hparams.batch_size).unsqueeze(1).to(memory.device)
-            for i in range(pred_len):
-                decode = self.decoder(
-                    tgt=self.embedding(target).permute((1, 0, 2)),
-                    memory=memory,
-                    memory_key_padding_mask=memory_key_padding_mask
-                )
-
-                # Head:
-                output = self.head(decode).permute((1, 0, 2)) # [bsz, seq_len, vsz]
-                output = self.top_p_filtering(output[:, i:i+1, :], top_p=self.hparams.top_p)
-                prob = F.softmax(output, dim=2).squeeze(1)
-                token = torch.multinomial(prob, 1)
-                # token = torch.argmax(output[:, :, i:i+1], dim=1) # [bsz, 1]
-                target = torch.cat([target, token], dim=1)
-            return target
-
         # Decode:
         decode = self.decoder(
             tgt=self.embedding(target).permute((1, 0, 2)),
