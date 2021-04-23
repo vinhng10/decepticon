@@ -249,14 +249,14 @@ if __name__ == "__main__":
     trainer = pl.Trainer.from_argparse_args(
         args,
         checkpoint_callback=checkpoint,
+        callbacks=earlystopping,
         # early_stopping_callback=earlystopping, # TODO no idea how to add early_stopping here
         logger=logger
     )
     fx_dm.setup()
-    # trainer.fit(fx_model, fx_dm)
-    for batch in fx_dm.test_dataloader():
-        fx_model.test_step(batch, None)
-    # trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
+    trainer.fit(fx_model, fx_dm)
+    trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
+
     # fx_infer = RaceModule.load_from_checkpoint(checkpoint.best_model_path)
     # fx_infer.eval()
     # fx_dm.setup()

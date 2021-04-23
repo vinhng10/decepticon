@@ -69,7 +69,6 @@ class RaceModule(pl.LightningModule):
     def generate(self, inputs, use_beam=False, use_sample=False, **kwargs):
         """ Args:
             inputs dict: dict of input
-            pred_len (int): Length of predicted sequence.
             kwargs: for generation
 
             Returns:
@@ -120,6 +119,11 @@ class RaceModule(pl.LightningModule):
         self.log('val_perplexity', torch.exp(val_loss.detach()))
         return {'val_loss': val_loss}
 
+    def validation_epoch_end(self, outputs):
+        """"""
+        val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+        self.log("val_loss", val_loss, prog_bar=True, logger=True)
+
     def test_step(self, batch, batch_idx):
         """"""
         # Prepare data:
@@ -151,7 +155,7 @@ class RaceModule(pl.LightningModule):
 
         return metrics
 
-    def generate_with_beam(self, context,
+    def generate_with_beam(self, inputs,
                            num_beams: int = 6,
                            no_repeat_ngram_size: int = 2,
                            max_length: int = 30,
@@ -159,33 +163,29 @@ class RaceModule(pl.LightningModule):
                            num_beam_groups: int = 2):
         """"""
 
-        generated = self.model.generate(input_ids=context, # context -> answer + article
+        generated = self.model.generate(**inputs, # context -> answer + article
                                         num_beams=num_beams,
                                         num_beam_groups=num_beam_groups,
                                         max_length=max_length,
                                         no_repeat_ngram_size=no_repeat_ngram_size,
                                         early_stopping=early_stopping)
 
-        # generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
+        return generated
 
-        return generated.view(context.shape[0], -1)
-
-    def generate_with_sampling(self, context,
+    def generate_with_sampling(self, inputs,
                                top_k: int = 75,
                                top_p: float = 0.9,
                                max_length: int = 30,
                                do_sample: bool = True,
                                no_repeat_ngram_size: int = 2):
         """"""
-
-        generated = self.model.generate(input_ids=context, # context -> answer + article
+        # [bsz, pred_len]
+        generated = self.model.generate(**inputs, # context -> answer + article
                                         max_length=max_length,
                                         do_sample=do_sample,
                                         no_repeat_ngram_size=no_repeat_ngram_size,
                                         top_k=top_k,
                                         top_p=top_p)
 
-        # generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
-
-        return generated.view(context.shape[0], -1)
+        return generated
 
