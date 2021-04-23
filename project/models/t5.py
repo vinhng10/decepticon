@@ -121,17 +121,39 @@ class RaceModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         """"""
-        x, y = batch
-        output = self(x["input_ids"], x["attention_mask"], self.mask_label_padding(y["input_ids"]))
-        loss = output[0]
-        return loss
+        inputs, targets = self.batch_fn(batch)
+
+        # Generations:
+        generations = self.generate(
+            inputs=inputs,
+            pred_len=64,
+        )
+
+        predictions = [
+            self.tokenizer.decode(generation, skip_special_tokens=True)
+            for generation in generations
+        ]
+
+        references = [
+            self.tokenizer.decode(target, skip_special_tokens=True)
+            for target in targets["input_ids"]
+        ]
+
+        # Compute metrics:
+        inputs = Input(predictions=predictions, references=references)
+        metrics = self.metrics.compute_metrics(inputs)
+
+        # Log:
+        self.log_dict(metrics)
+
+        return metrics
 
     def generate_with_beam(self, context,
-                           num_beams: int=6, 
-                           no_repeat_ngram_size: int=2,
-                           max_length: int=30,
-                           early_stopping: bool=False,
-                           num_beam_groups: int=2):
+                           num_beams: int = 6,
+                           no_repeat_ngram_size: int = 2,
+                           max_length: int = 30,
+                           early_stopping: bool = False,
+                           num_beam_groups: int = 2):
         """"""
         
         generated = self.model.generate(input_ids=context, # context -> answer + article
