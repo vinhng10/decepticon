@@ -283,7 +283,7 @@ class RaceDataModule(LightningDataModule):
         context = []
         questions = []
         for item in batch:
-            context.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
+            context.append(" ".join(["[ANS]", item["answer"], "[CON]", item["article"]]))
             questions.append(item["question"])
         context = tokenizer(text=context,
                             padding=True,
@@ -309,7 +309,7 @@ class RaceDataModule(LightningDataModule):
         context = []
         distractor = []
         for item in batch:
-            context.append(" ".join(["<answer>", item["answer"], "<question>", item["question"], "<context>", item["article"]]))
+            context.append(" ".join(["[ANS]", item["answer"], "[QUE]", item["question"], "[CON]", item["article"]]))
             indx = np.random.randint(low=0, high=len(item["distractors"]), size=1)[0]
             # print(item["distractors"])
             distractor.append(item["distractors"][indx])
