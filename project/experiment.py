@@ -16,11 +16,11 @@ from data.data import *
 def main(hparams):
     seed_everything(hparams.seed)
     
-    data = RaceDataModule(hparams, custom_collate_fn = RaceDataModule.t5_collate_fn)
+    data = RaceDataModule(hparams, customed_collate_fn = RaceDataModule.t5_collate_fn)
     #hparams.tokenizer_len = len(data_module.tokenizer)
     early_stop_callback = EarlyStopping(
         monitor='val_perplexity',
-        min_delta=0.1,
+        min_delta=0.5,
         patience=3,
         verbose=False,
         mode="min")
@@ -38,19 +38,18 @@ def main(hparams):
     
     trainer = Trainer(accumulate_grad_batches=hparams.accumulate_grad_batches,
                       checkpoint_callback = checkpoint_callback,
-            #          callbacks = LearningRateMonitor(),
-                      callbacks=[early_stop_callback],
+                      callbacks=[early_stop_callback, LearningRateMonitor()],
                       logger = logger,
                       terminate_on_nan = hparams.terminate_on_nan,
                       benchmark = True,
-                      pl_optimizer = True,
                       precision = 16,
                       #log_gpy_memory = True,
+                      enable_pl_optimizer=False,
                       track_grad_norm = 2,
-                      max_epochs = 20,
-                      log_every_n_steps = 150,
-                      gradient_clip_val = 5,
-                      stochastic_weight_avg = True,
+                      max_epochs = 30,
+                      log_every_n_steps = 200,
+                      gradient_clip_val = 1,
+                      stochastic_weight_avg = False,
                       gpus=-1)
     trainer.fit(model, data)
     
@@ -77,11 +76,11 @@ if __name__ == '__main__':
     
     # TRAINING
     parser.add_argument("--seed", default = 2020, type=float)
-    parser.add_argument("--weight_decay", default = 5e-5, type=float)
+    parser.add_argument("--weight_decay", default = 1e-4, type=float)
     parser.add_argument("--learning_rate", default = 1e-4, type=float)
-    parser.add_argument("--accumulate_grad_batches", default = 10, type=int)
+    parser.add_argument("--accumulate_grad_batches", default = 12, type=int)
     parser.add_argument("--terminate_on_nan", default = True, type=int)
-    parser.add_argument("--special_tokens", default = ["<answer>", "<context>"])
+    parser.add_argument("--special_tokens", default = ["[ANS]", "[CON]"])
     
     args = parser.parse_args()
     
