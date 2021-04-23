@@ -14,10 +14,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from torch.utils.data import Dataset, DataLoader
+import torch
 from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
 
+<<<<<<< HEAD
+=======
 import nltk
 from nltk import sent_tokenize, word_tokenize
 nltk.download('punkt')
@@ -276,6 +279,77 @@ class RaceDataModule(LightningDataModule):
             "distractors": tokenizer(distractors, padding=True, return_tensors="pt"),
         }
 
+    @staticmethod
+    def t5_collate_fn(batch, tokenizer):
+        """"""
+        context = []
+        questions = []
+        for item in batch:
+            context.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
+            questions.append(item["question"])
+        context = tokenizer(text=context,
+                            padding=True,
+                            truncation=True,
+                            return_tensors="pt",
+                            pad_to_max_length=True,
+                            max_length=512)
+        questions = tokenizer(questions,
+                              padding=True,
+                              truncation=True,
+                              return_tensors="pt",
+                              pad_to_max_length=True,
+                              max_length=512)
+
+        context['input_ids'] = torch.squeeze(context['input_ids'])
+        context['attention_mask'] = torch.squeeze(context['attention_mask'])
+        questions['input_ids'] = torch.squeeze(questions['input_ids'])
+        questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
+        return (context, questions)
+
+    def distractor_collate_fn(batch, tokenizer):
+        """"""
+        context = []
+        distractor = []
+        for item in batch:
+            context.append(" ".join(["<answer>", item["answer"], "<question>", item["question"], "<context>", item["article"]]))
+            indx = np.random.randint(low=0, high=len(item["distractors"]), size=1)[0]
+            # print(item["distractors"])
+            distractor.append(item["distractors"][indx])
+
+        context = tokenizer(text=context,
+                            padding=True,
+                            truncation=True,
+                            return_tensors="pt",
+                            pad_to_max_length=True,
+                            max_length=512)
+
+        distractor = tokenizer(distractor,
+                               padding=True,
+                               truncation=True,
+                               return_tensors="pt",
+                               pad_to_max_length=True,
+                               max_length=512)
+
+        context['input_ids'] = torch.squeeze(context['input_ids'])
+        context['attention_mask'] = torch.squeeze(context['attention_mask'])
+        distractor['input_ids'] = torch.squeeze(distractor['input_ids'])
+        distractor['attention_mask'] = torch.squeeze(distractor['attention_mask'])
+        return (context, distractor)
+
+    def __init__(self, hparams, custom_collate_fn=None):
+        """"""
+        super().__init__()
+        self.hparams = hparams
+
+        if custom_collate_fn:
+            print("DataModule: Custom collate function is detected")
+            self.collate_fn = custom_collate_fn
+        else:
+            self.collate_fn = self.default_collate_fn
+
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
+
     def __init__(self, hparams, customed_collate_fn=None):
         """"""
         super().__init__()
@@ -296,13 +370,16 @@ class RaceDataModule(LightningDataModule):
     def setup(self, stage=None):
         """"""
         # Prepare data paths:
-        train_paths = Path(self.hparams.data_path).glob("train/*/*")
-        val_paths = Path(self.hparams.data_path).glob("dev/*/*")
-        test_paths = Path(self.hparams.data_path).glob("test/*/*")
+        train_paths = Path(self.hparams.data_path).glob("train/*/*.txt")
+        val_paths = Path(self.hparams.data_path).glob("dev/*/*.txt")
+        test_paths = Path(self.hparams.data_path).glob("test/*/*.txt")
 
         # Prepare datasets
+        print("SETUP: Training Dataset")
         self.trainset = RaceDataset(train_paths)
+        print("SETUP: Validation Dataset")
         self.valset = RaceDataset(val_paths)
+        print("SETUP: Test Dataset")
         self.testset = RaceDataset(test_paths)
 
     def train_dataloader(self):

@@ -207,6 +207,7 @@ class RaceModule(pl.LightningModule):
         self.log("val_loss", val_loss, prog_bar=True, logger=True)
 
     def test_step(self, batch, batch_idx):
+        """"""
         # Prepare data:
         inputs, targets = batch["inputs"], batch["targets"]
 
