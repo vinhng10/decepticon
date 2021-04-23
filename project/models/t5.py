@@ -63,10 +63,10 @@ class RaceModule(pl.LightningModule):
     def mask_label_padding(self, labels):
         """"""
         MASK_ID = -100
-        labels[labels == self.hparams.padding_token] = MASK_ID 
+        labels[labels == self.hparams.padding_token] = MASK_ID
         return labels
 
-    def generate(self, inputs, pred_len, use_beam=False, use_sample=False, **kwargs):
+    def generate(self, inputs, use_beam=False, use_sample=False, **kwargs):
         """ Args:
             inputs dict: dict of input
             pred_len (int): Length of predicted sequence.
@@ -77,9 +77,9 @@ class RaceModule(pl.LightningModule):
         """
         assert use_beam or use_sample, 'Must use one method for generation'
         if use_beam:
-            return self.generate_with_beam(inputs, max_length=pred_len, **kwargs)
+            return self.generate_with_beam(inputs, **kwargs)
         if use_sample:
-            return self.generate_with_sampling(inputs, max_length=pred_len, **kwargs)
+            return self.generate_with_sampling(inputs, **kwargs)
 
     def forward(self, ids, mask, labels):
         """"""
@@ -101,6 +101,7 @@ class RaceModule(pl.LightningModule):
         return {'optimizer': optimizer, 'lr_scheduler': scheduler}
 
     def training_step(self, batch, batch_idx):
+        """"""
         x, y = self.batch_fn(batch)
         output = self(x["input_ids"], x["attention_mask"], self.mask_label_padding(y["input_ids"]))
         loss = output.loss
@@ -109,7 +110,7 @@ class RaceModule(pl.LightningModule):
         self.logger.experiment.log_metric('train_perplexity', torch.exp(loss.detach()))
 
         return {"loss": loss}
-        
+
     def validation_step(self, batch, batch_idx):
         """"""
         val_loss = self.training_step(batch, batch_idx)['loss']
@@ -121,12 +122,14 @@ class RaceModule(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         """"""
-        inputs, targets = self.batch_fn(batch)
+        # Prepare data:
+        x, y = batch
 
         # Generations:
         generations = self.generate(
-            inputs=inputs,
-            pred_len=64,
+            inputs=x,
+            use_sample=True,
+            max_length=64,
         )
 
         predictions = [
@@ -136,7 +139,7 @@ class RaceModule(pl.LightningModule):
 
         references = [
             self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in targets["input_ids"]
+            for target in x["input_ids"]
         ]
 
         # Compute metrics:
@@ -155,33 +158,33 @@ class RaceModule(pl.LightningModule):
                            early_stopping: bool = False,
                            num_beam_groups: int = 2):
         """"""
-        
+
         generated = self.model.generate(input_ids=context, # context -> answer + article
                                         num_beams=num_beams,
                                         num_beam_groups=num_beam_groups,
                                         max_length=max_length,
                                         no_repeat_ngram_size=no_repeat_ngram_size,
                                         early_stopping=early_stopping)
-        
+
         # generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
 
         return generated.view(context.shape[0], -1)
-        
+
     def generate_with_sampling(self, context,
-                               top_k: int=75,
-                               top_p: float=0.9,
+                               top_k: int = 75,
+                               top_p: float = 0.9,
                                max_length: int = 30,
-                               do_sample: bool=True,
-                               no_repeat_ngram_size: int=2):
+                               do_sample: bool = True,
+                               no_repeat_ngram_size: int = 2):
         """"""
-        
-        generated = self.model.generate(input_ids = context, # context -> answer + article
+
+        generated = self.model.generate(input_ids=context, # context -> answer + article
                                         max_length=max_length,
-                                        do_sample = do_sample,
-                                        no_repeat_ngram_size = no_repeat_ngram_size,
-                                        top_k = top_k,
-                                        top_p = top_p)
-        
+                                        do_sample=do_sample,
+                                        no_repeat_ngram_size=no_repeat_ngram_size,
+                                        top_k=top_k,
+                                        top_p=top_p)
+
         # generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
 
         return generated.view(context.shape[0], -1)
