@@ -5,7 +5,7 @@ import glob
 import json
 from pathlib import Path
 from tqdm import tqdm
-from collections import *
+from collections import Counter
 from functools import partial
 from argparse import ArgumentParser
 
@@ -174,7 +174,7 @@ class RaceDataProcessor:
         save_path = Path(save_path)
 
         # Glob data paths:
-        paths = Path(data_path).glob("*/*/*.txt")
+        paths = Path(data_path).glob("*/*/*")
 
         # Process data:
         for path in tqdm(paths):
@@ -271,18 +271,89 @@ class RaceDataModule(LightningDataModule):
             distractors.append(tokenizer.additional_special_tokens[-1].join(item["distractors"]))
 
         return {
-            "articles": tokenizer(articles, padding=True, truncation=True, return_tensors="pt"),
-            "questions": tokenizer(questions, padding=True, truncation=True, return_tensors="pt"),
-            "answers": tokenizer(answers, padding=True, truncation=True, return_tensors="pt"),
-            "distractors": tokenizer(distractors, padding=True, truncation=True, return_tensors="pt"),
+            "articles": tokenizer(articles, padding=True, truncation=True, max_length=500, return_tensors="pt"),
+            "questions": tokenizer(questions, padding=True, return_tensors="pt"),
+            "answers": tokenizer(answers, padding=True, return_tensors="pt"),
+            "distractors": tokenizer(distractors, padding=True, return_tensors="pt"),
         }
+
+    @staticmethod
+    def t5_collate_fn(batch, tokenizer):
+        """"""
+        context = []
+        questions = []
+        for item in batch:
+            context.append(" ".join(["<answer>", item["answer"], "<context>", item["article"]]))
+            questions.append(item["question"])
+        context = tokenizer(text=context,
+                            padding=True,
+                            truncation=True,
+                            return_tensors="pt",
+                            pad_to_max_length=True,
+                            max_length=512)
+        questions = tokenizer(questions,
+                              padding=True,
+                              truncation=True,
+                              return_tensors="pt",
+                              pad_to_max_length=True,
+                              max_length=512)
+
+        context['input_ids'] = torch.squeeze(context['input_ids'])
+        context['attention_mask'] = torch.squeeze(context['attention_mask'])
+        questions['input_ids'] = torch.squeeze(questions['input_ids'])
+        questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
+        return (context, questions)
+
+    def distractor_collate_fn(batch, tokenizer):
+        """"""
+        context = []
+        distractor = []
+        for item in batch:
+            context.append(" ".join(["<answer>", item["answer"], "<question>", item["question"], "<context>", item["article"]]))
+            indx = np.random.randint(low=0, high=len(item["distractors"]), size=1)[0]
+            # print(item["distractors"])
+            distractor.append(item["distractors"][indx])
+
+        context = tokenizer(text=context,
+                            padding=True,
+                            truncation=True,
+                            return_tensors="pt",
+                            pad_to_max_length=True,
+                            max_length=512)
+
+        distractor = tokenizer(distractor,
+                               padding=True,
+                               truncation=True,
+                               return_tensors="pt",
+                               pad_to_max_length=True,
+                               max_length=512)
+
+        context['input_ids'] = torch.squeeze(context['input_ids'])
+        context['attention_mask'] = torch.squeeze(context['attention_mask'])
+        distractor['input_ids'] = torch.squeeze(distractor['input_ids'])
+        distractor['attention_mask'] = torch.squeeze(distractor['attention_mask'])
+        return (context, distractor)
+
+    def __init__(self, hparams, custom_collate_fn=None):
+        """"""
+        super().__init__()
+        self.hparams = hparams
+
+        if custom_collate_fn:
+            print("DataModule: Custom collate function is detected")
+            self.collate_fn = custom_collate_fn
+        else:
+            self.collate_fn = self.default_collate_fn
+
+        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
 
     def __init__(self, hparams, customed_collate_fn=None):
         """"""
         super().__init__()
         self.hparams = hparams
 
-        if customed_collate_fn:
+        if customed_collate_fn is not None:
             self.collate_fn = customed_collate_fn
         else:
             self.collate_fn = self.default_collate_fn
