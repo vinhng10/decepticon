@@ -19,8 +19,6 @@ from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
 
-<<<<<<< HEAD
-=======
 import nltk
 from nltk import sent_tokenize, word_tokenize
 nltk.download('punkt')
