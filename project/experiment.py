@@ -16,11 +16,11 @@ from data.data import *
 def main(hparams):
     seed_everything(hparams.seed)
     
-    data = RaceDataModule(hparams, custom_collate_fn = RaceDataModule.t5_collate_fn)
+    data = RaceDataModule(hparams, customed_collate_fn = RaceDataModule.t5_collate_fn)
     #hparams.tokenizer_len = len(data_module.tokenizer)
     early_stop_callback = EarlyStopping(
         monitor='val_perplexity',
-        min_delta=0.1,
+        min_delta=0.5,
         patience=3,
         verbose=False,
         mode="min")
