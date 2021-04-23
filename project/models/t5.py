@@ -66,10 +66,9 @@ class RaceModule(pl.LightningModule):
         labels[labels == self.hparams.padding_token] = MASK_ID
         return labels
 
-    def generate(self, inputs, pred_len, use_beam=False, use_sample=False, **kwargs):
+    def generate(self, inputs, use_beam=False, use_sample=False, **kwargs):
         """ Args:
             inputs dict: dict of input
-            pred_len (int): Length of predicted sequence.
             kwargs: for generation
 
             Returns:
@@ -77,9 +76,9 @@ class RaceModule(pl.LightningModule):
         """
         assert use_beam or use_sample, 'Must use one method for generation'
         if use_beam:
-            return self.generate_with_beam(inputs, max_length=pred_len, **kwargs)
+            return self.generate_with_beam(inputs, **kwargs)
         if use_sample:
-            return self.generate_with_sampling(inputs, max_length=pred_len, **kwargs)
+            return self.generate_with_sampling(inputs, **kwargs)
 
     def forward(self, ids, mask, labels):
         """"""
@@ -127,9 +126,9 @@ class RaceModule(pl.LightningModule):
 
         # Generations:
         generations = self.generate(
-            inputs=inputs,
-            pred_len=64,
-            memory_key_padding_mask=inputs["attention_mask"] == 0
+            inputs=x,
+            use_sample=True,
+            max_length=64,
         )
 
         predictions = [
@@ -139,7 +138,7 @@ class RaceModule(pl.LightningModule):
 
         references = [
             self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in targets["input_ids"]
+            for target in x["input_ids"]
         ]
 
         # Compute metrics:
@@ -152,11 +151,11 @@ class RaceModule(pl.LightningModule):
         return metrics
 
     def generate_with_beam(self, context,
-                           num_beams: int=6,
-                           no_repeat_ngram_size: int=2,
-                           max_length: int=30,
-                           early_stopping: bool=False,
-                           num_beam_groups: int=2):
+                           num_beams: int = 6,
+                           no_repeat_ngram_size: int = 2,
+                           max_length: int = 30,
+                           early_stopping: bool = False,
+                           num_beam_groups: int = 2):
         """"""
 
         generated = self.model.generate(input_ids=context, # context -> answer + article
@@ -171,19 +170,19 @@ class RaceModule(pl.LightningModule):
         return generated.view(context.shape[0], -1)
 
     def generate_with_sampling(self, context,
-                               top_k: int=75,
-                               top_p: float=0.9,
+                               top_k: int = 75,
+                               top_p: float = 0.9,
                                max_length: int = 30,
-                               do_sample: bool=True,
-                               no_repeat_ngram_size: int=2):
+                               do_sample: bool = True,
+                               no_repeat_ngram_size: int = 2):
         """"""
 
-        generated = self.model.generate(input_ids = context, # context -> answer + article
+        generated = self.model.generate(input_ids=context, # context -> answer + article
                                         max_length=max_length,
-                                        do_sample = do_sample,
-                                        no_repeat_ngram_size = no_repeat_ngram_size,
-                                        top_k = top_k,
-                                        top_p = top_p)
+                                        do_sample=do_sample,
+                                        no_repeat_ngram_size=no_repeat_ngram_size,
+                                        top_k=top_k,
+                                        top_p=top_p)
 
         # generated = generated # returnx [batch * NUM_RETURN_SEQ x MAX_LENGTH]
 
