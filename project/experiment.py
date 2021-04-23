@@ -38,19 +38,18 @@ def main(hparams):
     
     trainer = Trainer(accumulate_grad_batches=hparams.accumulate_grad_batches,
                       checkpoint_callback = checkpoint_callback,
-            #          callbacks = LearningRateMonitor(),
-                      callbacks=[early_stop_callback],
+                      callbacks=[early_stop_callback, LearningRateMonitor()],
                       logger = logger,
                       terminate_on_nan = hparams.terminate_on_nan,
-                      benchmark = True,
-                      pl_optimizer = True,
+                      benchmark = False,
                       precision = 16,
                       #log_gpy_memory = True,
+                      enable_pl_optimizer=False,
                       track_grad_norm = 2,
                       max_epochs = 20,
                       log_every_n_steps = 150,
                       gradient_clip_val = 5,
-                      stochastic_weight_avg = True,
+                      stochastic_weight_avg = False,
                       gpus=-1)
     trainer.fit(model, data)
     
@@ -77,7 +76,7 @@ if __name__ == '__main__':
     
     # TRAINING
     parser.add_argument("--seed", default = 2020, type=float)
-    parser.add_argument("--weight_decay", default = 5e-5, type=float)
+    parser.add_argument("--weight_decay", default = 1e-4, type=float)
     parser.add_argument("--learning_rate", default = 1e-4, type=float)
     parser.add_argument("--accumulate_grad_batches", default = 10, type=int)
     parser.add_argument("--terminate_on_nan", default = True, type=int)
