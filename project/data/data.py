@@ -22,6 +22,8 @@ import nltk
 from nltk import sent_tokenize, word_tokenize
 nltk.download('punkt')
 
+from project.utils.utils import default_collate_fn
+
 
 def tokenize(st):
     ans = []
@@ -67,12 +69,10 @@ class RaceDataProcessor:
 
     def process_common(self, text):
         """ Preprocess text.
-
         Parameters
         ----------
         text: str
             Text to be processed.
-
         Returns
         -------
         text: str
@@ -88,12 +88,10 @@ class RaceDataProcessor:
 
     def process_question(self, question):
         """ Preprocess question.
-
         Parameters
         ----------
         question: str
             Question to be processed.
-
         Returns
         -------
         question: str
@@ -111,12 +109,10 @@ class RaceDataProcessor:
 
     def process_options(self, options):
         """ Preprocess options.
-
         Parameters
         ----------
         options: list of str
             Options to be processed.
-
         Returns
         -------
         options: list of str
@@ -131,12 +127,10 @@ class RaceDataProcessor:
 
     def process_article(self, article):
         """ Preprocess article.
-
         Parameters
         ----------
         article: str
             Article to be processed.
-
         Returns
         -------
         article: str
@@ -152,19 +146,16 @@ class RaceDataProcessor:
 
     def process_data(self, data_path, save_path):
         """ Preprocess data.
-
         The function will perform preprocessing on all files in the directory
         given in the "data_path". The processed data will be saved to the
         directory given in the "save_path". The directory structure of the
         processed files will be the same as that of the raw data files.
-
         Parameters
         ----------
         data_path: str
             Path to raw data directory.
         save_path: str
             Path to directory to save processed data.
-
         Returns
         -------
         None
@@ -255,27 +246,6 @@ class RaceDataModule(LightningDataModule):
                             help="Pretrained model.")
         return parser
 
-    @staticmethod
-    def default_collate_fn(batch, tokenizer):
-        """"""
-        articles = []
-        questions = []
-        answers = []
-        distractors = []
-
-        for item in batch:
-            articles.append(item["article"])
-            questions.append(item["question"])
-            answers.append(item["answer"])
-            distractors.append(tokenizer.additional_special_tokens[-1].join(item["distractors"]))
-
-        return {
-            "articles": tokenizer(articles, padding=True, truncation=True, max_length=500, return_tensors="pt"),
-            "questions": tokenizer(questions, padding=True, return_tensors="pt"),
-            "answers": tokenizer(answers, padding=True, return_tensors="pt"),
-            "distractors": tokenizer(distractors, padding=True, return_tensors="pt"),
-        }
-
     def __init__(self, hparams, customed_collate_fn=None):
         """"""
         super().__init__()
@@ -284,7 +254,7 @@ class RaceDataModule(LightningDataModule):
         if customed_collate_fn is not None:
             self.collate_fn = customed_collate_fn
         else:
-            self.collate_fn = self.default_collate_fn
+            self.collate_fn = default_collate_fn
 
         self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
         self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
@@ -296,9 +266,9 @@ class RaceDataModule(LightningDataModule):
     def setup(self, stage=None):
         """"""
         # Prepare data paths:
-        train_paths = Path(self.hparams.data_path).glob("train/*/*")
-        val_paths = Path(self.hparams.data_path).glob("dev/*/*")
-        test_paths = Path(self.hparams.data_path).glob("test/*/*")
+        train_paths = list(Path(self.hparams.data_path).glob("train/*/*"))
+        val_paths = list(Path(self.hparams.data_path).glob("dev/*/*"))
+        test_paths = list(Path(self.hparams.data_path).glob("test/*/*"))
 
         # Prepare datasets
         self.trainset = RaceDataset(train_paths)
@@ -340,4 +310,3 @@ class RaceDataModule(LightningDataModule):
             collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.test_loader
-
