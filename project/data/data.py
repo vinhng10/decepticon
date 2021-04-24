@@ -18,11 +18,12 @@ from pytorch_lightning import LightningDataModule
 
 from transformers import AutoTokenizer
 
+from utils.utils import default_collate_fn
+
 import nltk
 from nltk import sent_tokenize, word_tokenize
 nltk.download('punkt')
 
-from project.utils.utils import default_collate_fn
 
 
 def tokenize(st):
