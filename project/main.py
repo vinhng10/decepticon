@@ -51,7 +51,7 @@ if __name__ == "__main__":
         # filename = str(hparams.version).replace(".", "_"))
         monitor="val_loss"
     )
-    earlystopping = EarlyStopping(monitor='val_perplexity',
+    earlystopping = EarlyStopping(monitor='val_loss',
                                   min_delta=0.1,
                                   patience=3,
                                   verbose=False,
@@ -59,12 +59,11 @@ if __name__ == "__main__":
 
     # Logger:
     # logger = TensorBoardLogger('models/logs/')
-    """
     logger = NeptuneLogger(project_name="carlomarxdk/T5-for-RACE",
                            params=vars(args),
                            experiment_name="T5 finetuning to race: %s" % str(args.version),
                            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
-    """
+
     # Trainer:
     trainer = pl.Trainer.from_argparse_args(
         args,
