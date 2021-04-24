@@ -78,10 +78,3 @@ class Metrics:
             "rouge_l": self.compute_rouge(input),
         }
 
-
-
-
-
-
-
-
