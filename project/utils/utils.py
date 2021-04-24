@@ -1,5 +1,6 @@
-import torch
-import numpy as np
+#import torch
+#import numpy as np
+from typing import List, Dict
 
 
 def default_collate_fn(batch, tokenizer):
@@ -145,3 +146,25 @@ def display_result_as_string(tokenizer, ans, output, tgt):
     print("OUT:", out_str)
 
 
+def serialize_config(config: Dict) -> List[str]:
+    """"""
+
+    # Get an empty list for serialized config:
+    serialized_config = []
+
+    for key, value in config.items():
+        # Append key:
+        serialized_config.append("--" + key)
+
+        # Append value:
+        if isinstance(value, int) or isinstance(value, float) or \
+           isinstance(value, str) or isinstance(value, bool):
+            serialized_config.append(str(value))
+        elif isinstance(value, List):
+            serialized_config += [str(val) for val in value]
+        elif isinstance(value, bool):
+            continue
+        else:
+            raise ValueError(f"Invalid value in config file: {value}")
+
+    return serialized_config
