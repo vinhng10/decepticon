@@ -121,3 +121,27 @@ def rnn_dis_batch_fn(batch):
     return x, y
 
 
+def display_result_as_string(tokenizer, ans, output, tgt):
+    """
+    Args:
+        vocab dictionary of [index, word]
+        ans (bsz, seq_len) Tensor
+        tgt (bsz, seq_len) Tensor
+        output (bsz, seq_len, vocab_size) OR (bsz, seq_len) Tensor
+    """
+    ans = ans[0, :].long().numpy()
+    tgt = tgt[0, :].long().numpy()
+    if len(output.shape) == 3:
+        output = output[0, :, :].numpy()
+        output = np.argmax(output, axis=1)
+    else:
+        output = output[0, :].long().numpy()
+    ans_str = ' '.join(tokenizer.convert_ids_to_tokens(ans, True))
+    tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt, True))
+    out_str = ' '.join(tokenizer.convert_ids_to_tokens(output, True))
+    print("\n============================")
+    print("ANS:", ans_str)
+    print("TGT:", tgt_str)
+    print("OUT:", out_str)
+
+
