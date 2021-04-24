@@ -10,7 +10,13 @@ from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
+# Internal Import:
 from data.data import RaceDataModule
+from utils.utils import (
+    t5_collate_fn, t5_dis_collate_fn,
+    transformer_collate_fn,
+    rnn_batch_fn, rnn_dis_batch_fn
+)
 
 
 def translate(tokenizer, ans, output, tgt):
@@ -35,102 +41,6 @@ def translate(tokenizer, ans, output, tgt):
     print("ANS:", ans_str)
     print("TGT:", tgt_str)
     print("OUT:", out_str)
-
-
-def t5_collate_fn(batch, tokenizer):
-    """"""
-    context = []
-    questions = []
-    for item in batch:
-        context.append(" ".join(["<ANS>", item["answer"], "<CON>", item["article"]]))
-        questions.append(item["question"])
-    context = tokenizer(text=context,
-                        padding=True,
-                        truncation=True,
-                        return_tensors="pt",
-                        pad_to_max_length=True,
-                        max_length=512)
-    questions = tokenizer(questions,
-                          padding=True,
-                          truncation=True,
-                          return_tensors="pt",
-                          pad_to_max_length=True,
-                          max_length=512)
-
-    context['input_ids'] = torch.squeeze(context['input_ids'])
-    context['attention_mask'] = torch.squeeze(context['attention_mask'])
-    questions['input_ids'] = torch.squeeze(questions['input_ids'])
-    questions['attention_mask'] = torch.squeeze(questions['attention_mask'])
-
-    return context, questions
-
-
-def t5_dis_collate_fn(batch, tokenizer):
-    """"""
-    context = []
-    distractor = []
-    for item in batch:
-        context.append(
-            " ".join(["<ANS>", item["answer"], "<QUE>", item["question"], "<CON>", item["article"]]))
-        indx = np.random.randint(low=0, high=len(item["distractors"]), size=1)[0]
-        distractor.append(item["distractors"][indx])
-
-    context = tokenizer(text=context,
-                        padding=True,
-                        truncation=True,
-                        return_tensors="pt",
-                        pad_to_max_length=True,
-                        max_length=512)
-
-    distractor = tokenizer(distractor,
-                           padding=True,
-                           truncation=True,
-                           return_tensors="pt",
-                           pad_to_max_length=True,
-                           max_length=512)
-
-    context['input_ids'] = torch.squeeze(context['input_ids'])
-    context['attention_mask'] = torch.squeeze(context['attention_mask'])
-    distractor['input_ids'] = torch.squeeze(distractor['input_ids'])
-    distractor['attention_mask'] = torch.squeeze(distractor['attention_mask'])
-
-    return context, distractor
-
-
-def transformer_collate_fn(batch, tokenizer):
-    con_token, que_token, ans_token, dis_token = tokenizer.additional_special_tokens
-
-    inputs = []
-    targets = []
-
-    for item in batch:
-        inputs.append(" ".join([con_token, item["article"], ans_token, item["answer"]]))
-        targets.append(" ".join([que_token, item["question"], dis_token, dis_token.join(item["distractors"])]))
-
-    return {
-        "inputs": tokenizer(inputs, padding=True, truncation=True, max_length=512, return_tensors="pt"),
-        "targets": tokenizer(targets, padding=True, truncation=True, return_tensors="pt"),
-    }
-
-
-def transfomer_batch_fn(batch):
-    pass
-
-
-def rnn_batch_fn(batch):
-    """
-    Description: from batch to x, y
-    """
-    art, que, ans = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids']
-    x, y = torch.cat([ans, art], dim=1).long(), que.long()
-    return x, y
-
-
-def rnn_dis_batch_fn(batch):
-    art, que, ans, dis = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids'], \
-                         batch["distractors"]['input_ids']
-    x, y = torch.cat([que, ans, art], dim=1).long(), dis.long()
-    return x, y
 
 
 if __name__ == "__main__":

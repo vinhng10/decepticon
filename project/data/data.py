@@ -22,6 +22,8 @@ import nltk
 from nltk import sent_tokenize, word_tokenize
 nltk.download('punkt')
 
+from project.utils.utils import default_collate_fn
+
 
 def tokenize(st):
     ans = []
@@ -244,27 +246,6 @@ class RaceDataModule(LightningDataModule):
                             help="Pretrained model.")
         return parser
 
-    @staticmethod
-    def default_collate_fn(batch, tokenizer):
-        """"""
-        articles = []
-        questions = []
-        answers = []
-        distractors = []
-
-        for item in batch:
-            articles.append(item["article"])
-            questions.append(item["question"])
-            answers.append(item["answer"])
-            distractors.append(tokenizer.additional_special_tokens[-1].join(item["distractors"]))
-
-        return {
-            "articles": tokenizer(articles, padding=True, truncation=True, max_length=500, return_tensors="pt"),
-            "questions": tokenizer(questions, padding=True, return_tensors="pt"),
-            "answers": tokenizer(answers, padding=True, return_tensors="pt"),
-            "distractors": tokenizer(distractors, padding=True, return_tensors="pt"),
-        }
-
     def __init__(self, hparams, customed_collate_fn=None):
         """"""
         super().__init__()
@@ -273,7 +254,7 @@ class RaceDataModule(LightningDataModule):
         if customed_collate_fn is not None:
             self.collate_fn = customed_collate_fn
         else:
-            self.collate_fn = self.default_collate_fn
+            self.collate_fn = default_collate_fn
 
         self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
         self.tokenizer.add_special_tokens({"additional_special_tokens": hparams.special_tokens})
