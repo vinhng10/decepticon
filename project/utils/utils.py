@@ -122,28 +122,27 @@ def rnn_dis_batch_fn(batch):
     return x, y
 
 
-def display_result_as_string(tokenizer, ans, output, tgt):
+def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_len=32):
     """
     Args:
-        vocab dictionary of [index, word]
-        ans (bsz, seq_len) Tensor
-        tgt (bsz, seq_len) Tensor
-        output (bsz, seq_len, vocab_size) OR (bsz, seq_len) Tensor
+        test_batch_fc: function making batch into variables con and tgt,
+        where con is the input of generate and tgt is the target sequence
+        pred_len: int, length of generated sequences
     """
-    ans = ans[0, :].long().numpy()
-    tgt = tgt[0, :].long().numpy()
-    if len(output.shape) == 3:
-        output = output[0, :, :].numpy()
-        output = np.argmax(output, axis=1)
-    else:
-        output = output[0, :].long().numpy()
-    ans_str = ' '.join(tokenizer.convert_ids_to_tokens(ans, True))
-    tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt, True))
-    out_str = ' '.join(tokenizer.convert_ids_to_tokens(output, True))
-    print("\n============================")
-    print("ANS:", ans_str)
-    print("TGT:", tgt_str)
-    print("OUT:", out_str)
+    with torch.no_grad():
+        for batch in dataloader:
+            con, tgt = test_batch_fc(batch)
+            out = model.generate(con, pred_len=pred_len)
+            con = con[0, :].long().numpy()
+            tgt = tgt[0, :].long().numpy()
+            out = out[0, :].long().numpy()
+            con_str = ' '.join(tokenizer.convert_ids_to_tokens(con, True))
+            tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt, True))
+            out_str = ' '.join(tokenizer.convert_ids_to_tokens(out, True))
+            print("\n============================")
+            print("ANS:", con_str)
+            print("TGT:", tgt_str)
+            print("OUT:", out_str)
 
 
 def serialize_config(config: Dict) -> List[str]:

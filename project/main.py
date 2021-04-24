@@ -48,7 +48,6 @@ if __name__ == "__main__":
     checkpoint = ModelCheckpoint(
         dirpath='models/ckpts/',
         filename="./fx-{epoch:02d}-{val_loss:.7f}",
-        # filename = str(hparams.version).replace(".", "_"))
         monitor="val_loss"
     )
     earlystopping = EarlyStopping(monitor='val_loss',
@@ -69,24 +68,14 @@ if __name__ == "__main__":
         args,
         checkpoint_callback=checkpoint,
         callbacks=earlystopping,
-        #logger=logger
+        logger=logger
     )
     trainer.fit(fx_model, fx_dm)
     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
 
-    # fx_infer = RaceModule.load_from_checkpoint(checkpoint.best_model_path)
-    # fx_infer.eval()
-    # fx_dm.setup()
-    #
-    # with torch.no_grad():
-    #     for batch in fx_dm.test_dataloader():
-    #         # ans = batch['inputs']['input_ids']
-    #         ans = batch['answers']['input_ids']
-    #         if batch_fn:
-    #             x, y = batch_fn(batch)
-    #         else:
-    #             x, y = fx_infer.batch_fn(batch)
-    #         # out = fx_infer(x, pred_len=50)
-    #         out, _ = fx_infer(x)
-    #         # translate(fx_dm.tokenizer, ans, out, y['input_ids'])
-    #         translate(fx_dm.tokenizer, ans, out, y)
+    fx_infer = RaceModule.load_from_checkpoint(checkpoint.best_model_path)
+    fx_infer.eval()
+
+    test_batch_fn = lambda batch: (batch['inputs']['input_ids'], batch['targets']['input_ids'])
+    display_result_as_string(fx_dm.tokenizer, fx_dm.test_dataloader(),
+                             fx_infer, test_batch_fn)
