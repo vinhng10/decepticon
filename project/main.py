@@ -26,11 +26,11 @@ if __name__ == "__main__":
 
     # Choose the model
     # from models.transformer import RaceModule
-    # from models.rnn import RaceModule
-    from models.t5 import RaceModule
+    from models.rnn import RaceModule
+    # from models.t5 import RaceModule
 
-    batch_fn = None
-    collate_fn = t5_collate_fn
+    batch_fn = rnn_batch_fn
+    collate_fn = None
 
     pl.seed_everything(1234)
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     parser = RaceDataModule.add_model_specific_args(parser)
     parser = RaceModule.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)
-    config = yaml.load(open("project/configs/t5.yaml"), Loader=yaml.FullLoader)
+    config = yaml.load(open("project/configs/rnn.yaml"), Loader=yaml.FullLoader)
     args = parser.parse_args(serialize_config(config))
 
     fx_dm = RaceDataModule(args, collate_fn)
@@ -59,11 +59,13 @@ if __name__ == "__main__":
 
     # Logger:
     # logger = TensorBoardLogger('models/logs/')
+    """
     logger = NeptuneLogger(project_name="carlomarxdk/T5-for-RACE",
                            params=vars(args),
                            experiment_name="T5 finetuning to race: %s" % str(args.version),
                            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
-
+    """
+    
     # Trainer:
     trainer = pl.Trainer.from_argparse_args(
         args,

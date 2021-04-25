@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_lightning as pl
 
 # Internal Import:
-from project.metrics.metrics import Input, Metrics
+from metrics.metrics import Input, Metrics
 
 
 class RaceModule(pl.LightningModule):
