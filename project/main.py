@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping, LearningRateMonitor()
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping, LearningRateMonitor
 
 # Internal Import:
 from data.data import RaceDataModule
