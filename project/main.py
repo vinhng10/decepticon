@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping, LearningRateMonitor()
 
 # Internal Import:
 from data.data import RaceDataModule
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer.from_argparse_args(
         args,
         checkpoint_callback=checkpoint,
-        callbacks=earlystopping,
+        callbacks=[earlystopping, LearningRateMonitor()],
         logger=logger
     )
     trainer.fit(fx_model, fx_dm)
