@@ -25,7 +25,6 @@ from nltk import sent_tokenize, word_tokenize
 nltk.download('punkt')
 
 
-
 def tokenize(st):
     ans = []
     for sent in sent_tokenize(st):
