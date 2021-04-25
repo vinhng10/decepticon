@@ -5,3 +5,4 @@ transformers >= 4.5.1
 ipywidgets >= 7.6.3
 datasets >= 1.6.0
 rouge-score >= 0.0.4
+neptune-client >= 0.9.5

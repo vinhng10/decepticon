@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     # Logger:
     # logger = TensorBoardLogger('models/logs/')
-    logger = NeptuneLogger(project_name="carlomarxdk/RNN-QUES-for-RACE",
+    logger = NeptuneLogger(project_name="carlomarxdk/T5-for-RACE",
                            params=vars(args),
                            experiment_name="RNN_QUES finetuning to race: %s" % str(args.version),
                            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
