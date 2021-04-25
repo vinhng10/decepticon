@@ -1,7 +1,7 @@
-data_path: "data/RACE_processed"
-num_workers: 0
-batch_size: 2
-version: 8.8
+data_path: "D:/Github/decepticon/Processed_New"
+num_workers: 1
+batch_size: 12
+version: 9.0
 pretrained_model: "t5-small"
 auto_lr_find: False
 terminate_on_nan: True
@@ -10,15 +10,15 @@ track_grad_norm: 2
 precision: 16
 accumulate_grad_batches: 10
 gradient_clip_val: 5
-stochastic_weight_avg: True
+stochastic_weight_avg: False
 enable_pl_optimizer: True
-learning_rate: 1e-05
+learning_rate: 1e-04
 special_tokens:
     - "[CON]"
     - "[QUE]"
     - "[ANS]"
     - "[DIS]"
 gpus: 1
-max_epochs: 1
+max_epochs: 25
 log_every_n_steps: 150
 check_val_every_n_epoch: 1

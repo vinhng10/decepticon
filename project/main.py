@@ -10,6 +10,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.loggers.neptune import NeptuneLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.callbacks import LearningRateMonitor
 
 # Internal Import:
 from data.data import RaceDataModule
@@ -48,11 +49,10 @@ if __name__ == "__main__":
     checkpoint = ModelCheckpoint(
         dirpath='models/ckpts/',
         filename="./fx-{epoch:02d}-{val_loss:.7f}",
-        # filename = str(hparams.version).replace(".", "_"))
         monitor="val_loss"
     )
     earlystopping = EarlyStopping(monitor='val_loss',
-                                  min_delta=0.1,
+                                  min_delta=0.05,
                                   patience=3,
                                   verbose=False,
                                   mode="min")
@@ -65,12 +65,12 @@ if __name__ == "__main__":
                            experiment_name="T5 finetuning to race: %s" % str(args.version),
                            api_key='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiMTY1YzBlY2QtOTFlMS00Yzg2LWJiYzItNjQ2NDlhOGRhN2M5In0=')
     """
-    
+
     # Trainer:
     trainer = pl.Trainer.from_argparse_args(
         args,
         checkpoint_callback=checkpoint,
-        callbacks=earlystopping,
+        callbacks=[earlystopping, LearningRateMonitor()],
         #logger=logger
     )
     trainer.fit(fx_model, fx_dm)
