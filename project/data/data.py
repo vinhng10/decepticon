@@ -165,7 +165,7 @@ class RaceDataProcessor:
         save_path = Path(save_path)
 
         # Glob data paths:
-        paths = Path(data_path).glob("*/*/*")
+        paths = Path(data_path).glob("*/*/*.txt")
 
         # Process data:
         for path in tqdm(paths):
@@ -267,9 +267,9 @@ class RaceDataModule(LightningDataModule):
     def setup(self, stage=None):
         """"""
         # Prepare data paths:
-        train_paths = list(Path(self.hparams.data_path).glob("train/*/*"))
-        val_paths = list(Path(self.hparams.data_path).glob("dev/*/*"))
-        test_paths = list(Path(self.hparams.data_path).glob("test/*/*"))
+        train_paths = list(Path(self.hparams.data_path).glob("train/*/*.txt"))
+        val_paths = list(Path(self.hparams.data_path).glob("dev/*/*.txt"))
+        test_paths = list(Path(self.hparams.data_path).glob("test/*/*.txt"))
 
         # Prepare datasets
         self.trainset = RaceDataset(train_paths)

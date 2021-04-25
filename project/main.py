@@ -38,7 +38,7 @@ if __name__ == "__main__":
     parser = RaceDataModule.add_model_specific_args(parser)
     parser = RaceModule.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)
-    config = yaml.load(open("project/configs/t5.yaml"), Loader=yaml.FullLoader)
+    config = yaml.load(open("configs/t5.yaml"), Loader=yaml.FullLoader)
     args = parser.parse_args(serialize_config(config))
 
     fx_dm = RaceDataModule(args, collate_fn)
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         monitor="val_loss"
     )
     earlystopping = EarlyStopping(monitor='val_loss',
-                                  min_delta=0.1,
+                                  min_delta=0.05,
                                   patience=3,
                                   verbose=False,
                                   mode="min")
@@ -69,7 +69,7 @@ if __name__ == "__main__":
         args,
         checkpoint_callback=checkpoint,
         callbacks=earlystopping,
-        #logger=logger
+        logger=logger
     )
     trainer.fit(fx_model, fx_dm)
     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())

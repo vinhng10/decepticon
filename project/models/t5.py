@@ -22,9 +22,9 @@ class RaceModule(pl.LightningModule):
                             help="specify it in a form X.XX")
         parser.add_argument("--padding_token", type=int, default=0,
                             help="don't change it")
-        parser.add_argument("--tokenizer_len", type=int, default=32102,
+        parser.add_argument("--tokenizer_len", type=int, default=32104,
                             help="don't touch it")
-        parser.add_argument("--seed", default=2020, type=float)
+        parser.add_argument("--seed", default=1234, type=float)
         parser.add_argument("--weight_decay", default=5e-5, type=float)
         parser.add_argument("--learning_rate", default=1e-4, type=float)
 
@@ -56,7 +56,7 @@ class RaceModule(pl.LightningModule):
             try:
                 self.model.resize_token_embeddings(self.hparams.tokenizer_len)
             except:
-                self.model.resize_token_embeddings(32102)
+                self.model.resize_token_embeddings(32104)
         else:
             raise NotImplementedError
 
