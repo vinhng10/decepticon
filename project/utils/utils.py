@@ -121,6 +121,32 @@ def rnn_dis_batch_fn(batch):
     x, y = torch.cat([que, ans, art], dim=1).long(), dis.long()
     return x, y
 
+def display_result_as_string_(tokenizer, dataloader, model, test_batch_fc, pred_len=32, f=None):
+    """
+    Args:
+        test_batch_fc: function making batch into variables con and tgt,
+        where con is the input of generate and tgt is the target sequence
+        pred_len: int, length of generated sequences
+    """
+    with torch.no_grad():
+        for batch in dataloader:
+            con, x, tgt = test_batch_fc(batch)
+            out = model.generate(x, pred_len=pred_len)
+            con = con[0, :].long().numpy()
+            tgt = tgt[0, :].long().numpy()
+            out = out[0, :].long().numpy()
+            con_str = ' '.join(tokenizer.convert_ids_to_tokens(con))
+            tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt))
+            out_str = ' '.join(tokenizer.convert_ids_to_tokens(out))
+            if f:
+                f.write("CON:"+con_str+'\n')
+                f.write("TGT:"+tgt_str+'\n')
+                f.write("OUT:"+out_str+'\n')
+                f.write('=======================\n')
+            print("\n============================")
+            print("CON:", con_str)
+            print("TGT:", tgt_str)
+            print("OUT:", out_str)
 
 def display_result_as_string(tokenizer, ans, output, tgt):
     """
@@ -130,20 +156,24 @@ def display_result_as_string(tokenizer, ans, output, tgt):
         tgt (bsz, seq_len) Tensor
         output (bsz, seq_len, vocab_size) OR (bsz, seq_len) Tensor
     """
-    ans = ans[0, :].long().numpy()
+    if ans:
+        ans = ans[0, :].long().numpy()
     tgt = tgt[0, :].long().numpy()
     if len(output.shape) == 3:
         output = output[0, :, :].numpy()
         output = np.argmax(output, axis=1)
     else:
         output = output[0, :].long().numpy()
-    ans_str = ' '.join(tokenizer.convert_ids_to_tokens(ans, True))
-    tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt, True))
-    out_str = ' '.join(tokenizer.convert_ids_to_tokens(output, True))
+    if ans:
+        ans_str = ' '.join(tokenizer.convert_ids_to_tokens(ans, True))
+    tgt_str = tokenizer.decode(tgt, skip_special_tokens=True)
+    out_str = tokenizer.decode(output, skip_special_tokens=True)
     print("\n============================")
-    print("ANS:", ans_str)
+    if ans:
+        print("ANS:", ans_str)
     print("TGT:", tgt_str)
     print("OUT:", out_str)
+
 
 
 def serialize_config(config: Dict) -> List[str]:

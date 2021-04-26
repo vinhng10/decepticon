@@ -91,7 +91,6 @@ if __name__ == "__main__":
                         scheduler=bohb_hyperband,
                         search_alg=bohb_search,
                         num_samples=15,
-                        #stop={"training_iteration": 100},
                         metric="total_score",
                         mode="max", 
                         resources_per_trial={'gpu': 1},
