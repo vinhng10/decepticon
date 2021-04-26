@@ -66,7 +66,7 @@ if __name__ == "__main__":
         
         score = fn_objective(result["bleu_1"], result["bleu_2"], result["bleu_3"], result["bleu_4"], result["meteor"], result["rouge_l"])
         # Feed the score back back to Tune.
-        tune.report(loss=score)
+        tune.report(total_score=score)
     
     analysis = tune.run(
         training_function, resources_per_trial={'gpu': 1},
@@ -77,7 +77,7 @@ if __name__ == "__main__":
             "no_repeat_ngram_size": tune.choice([1,2,3])
         })
     
-    print("Best config: ", analysis.get_best_config(metric="loss", mode="max"))
+    print("Best config: ", analysis.get_best_config(metric="total_score", mode="max"))
     
     
 #     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
