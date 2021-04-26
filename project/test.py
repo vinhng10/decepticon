@@ -4,6 +4,7 @@ import torch
 import numpy as np
 from argparse import ArgumentParser
 from ray import tune
+from ray.tune.logger import JsonLoggerCallback
 
 
 # Pytorch Lightning Import:
@@ -60,6 +61,7 @@ if __name__ == "__main__":
         fx_model = RaceModule.load_from_checkpoint("D:/Github/decepticon/project/models/ckpts/t5.ckpt")
         fx_model.setup_tune(top_p = top_p, top_k = top_k, no_repeat_ngram_size = no_repeat_ngram_size)
         result = trainer.test(fx_model, test_dataloaders=fx_dm.val_dataloader())
+        result = result[0]
         
         score = fn_objective(result["bleu_1"], result["bleu_2"], result["bleu_3"], result["bleu_4"], result["meteor"], result["rouge_l"])
         # Feed the score back back to Tune.
@@ -67,6 +69,7 @@ if __name__ == "__main__":
     
     analysis = tune.run(
         training_function, resources_per_trial={'gpu': 1},
+        callbacks = [JsonLoggerCallback()],
         config={
             "top_p": tune.grid_search([0.8, 0.85, 0.9, 0.95, 0.97, 0.99]),
             "top_k": tune.choice([25, 50, 75, 100]),
