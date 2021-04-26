@@ -3,6 +3,7 @@ import yaml
 import torch
 import numpy as np
 from argparse import ArgumentParser
+import os
 
 # Pytorch Lightning Import:
 import pytorch_lightning as pl
@@ -24,7 +25,6 @@ from utils.utils import (
 
 
 if __name__ == "__main__":
-
     # Choose the model
     # from models.transformer import RaceModule
     # from models.rnn import RaceModule

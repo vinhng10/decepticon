@@ -5,7 +5,7 @@ import numpy as np
 from argparse import ArgumentParser
 from ray import tune
 from ray.tune.logger import CSVLoggerCallback, JsonLoggerCallback
-
+import os
 
 # Pytorch Lightning Import:
 import pytorch_lightning as pl
@@ -22,7 +22,8 @@ from utils.utils import (
 
 
 if __name__ == "__main__":
-
+    ##for RAY
+    os.environ["TUNE_DISABLE_AUTO_CALLBACK_LOGGERS"] = "1"
     # Choose the model
     # from models.transformer import RaceModule
     # from models.rnn import RaceModule
