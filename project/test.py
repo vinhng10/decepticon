@@ -51,6 +51,9 @@ if __name__ == "__main__":
     fx_dm.setup()
     
     ## I had to put it here 
+    def fn_objective(b1, b2, b3, b4, m, r):
+        return b1 + b2 + b3 + b4 + m + r
+
     def training_function(config):
     # Hyperparameters
         top_p, top_k, no_repeat_ngram_size = config["top_p"], config["top_k"], config["no_repeat_ngram_size"]
@@ -76,6 +79,5 @@ if __name__ == "__main__":
 #     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
 
 
-def fn_objective(b1, b2, b3, b4, m, r):
-    return b1 + b2 + b3 + b4 + m + r
+
 
