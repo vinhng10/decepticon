@@ -61,9 +61,10 @@ if __name__ == "__main__":
 
     def training_function(config):
     # Hyperparameters
-        top_p, top_k, no_repeat_ngram_size = config["top_p"], config["top_k"], config["no_repeat_ngram_size"]
+        #top_p, top_k, no_repeat_ngram_size = config["top_p"], config["top_k"]#, config["no_repeat_ngram_size"]
+        top_p, top_k = config["top_p"], config["top_k"]#, config["no_repeat_ngram_size"]
         fx_model = RaceModule.load_from_checkpoint("D:/Github/decepticon/project/models/ckpts/t5.ckpt")
-        fx_model.setup_tune(top_p = top_p, top_k = top_k, no_repeat_ngram_size = no_repeat_ngram_size)
+        fx_model.setup_tune(top_p = top_p, top_k = top_k, no_repeat_ngram_size = 2)
         result = trainer.test(fx_model, test_dataloaders=fx_dm.val_dataloader())
         result = result[0]
         
