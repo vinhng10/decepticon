@@ -43,6 +43,8 @@ if __name__ == "__main__":
     args = parser.parse_args(serialize_config(config))
 
     fx_dm = RaceDataModule(args, collate_fn)
+    fx_dm.setup()
+
     fx_model = RaceModule(args, batch_fn)
 
     # Callbacks:
@@ -72,6 +74,7 @@ if __name__ == "__main__":
         logger=logger
     )
 #     trainer.fit(fx_model, fx_dm)
+    fx_model.setup_tune(top_p = 0.98, top_k = 50, no_repeat_ngram_size = 2)
     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
 
     # fx_infer = RaceModule.load_from_checkpoint(checkpoint.best_model_path)
