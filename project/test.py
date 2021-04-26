@@ -78,7 +78,7 @@ if __name__ == "__main__":
             }
     
     
-    bohb_hyperband = HyperBandForBOHB(time_attr="training_iteration", max_t=100, reduction_factor=4, stop_last_trials=False)
+    bohb_hyperband = HyperBandForBOHB(time_attr="training_iteration", max_t=50, reduction_factor=4, stop_last_trials=False)
 
     bohb_search = TuneBOHB(max_concurrent=4)
 
@@ -87,8 +87,8 @@ if __name__ == "__main__":
                         config=config,
                         scheduler=bohb_hyperband,
                         search_alg=bohb_search,
-                        num_samples=10,
-                        stop={"training_iteration": 100},
+                        num_samples=20,
+                        stop={"training_iteration": 50},
                         metric="total_score",
                         mode="max", 
                         resources_per_trial={'gpu': 1},
