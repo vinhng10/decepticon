@@ -5,6 +5,8 @@ import numpy as np
 from argparse import ArgumentParser
 from ray import tune
 from ray.tune.logger import CSVLoggerCallback, JsonLoggerCallback
+from ray.tune.schedulers.hb_bohb import HyperBandForBOHB
+from ray.tune.suggest.bohb import TuneBOHB
 import os
 
 # Pytorch Lightning Import:
@@ -67,17 +69,39 @@ if __name__ == "__main__":
         score = fn_objective(result["bleu_1"], result["bleu_2"], result["bleu_3"], result["bleu_4"], result["meteor"], result["rouge_l"])
         # Feed the score back back to Tune.
         tune.report(total_score=score)
+        
+        
+    config={
+            "top_p": tune.uniform(0.75, 0.999),
+            "top_k": tune.randint(25, 125),
+            "no_repeat_ngram_size": tune.randint(0,4)
+            }
     
-    analysis = tune.run(
-        training_function, resources_per_trial={'gpu': 1},
-        callbacks = [CSVLoggerCallback(), JsonLoggerCallback()],
-        config={
-            "top_p": tune.grid_search([0.8, 0.85, 0.9, 0.95, 0.97, 0.99]),
-            "top_k": tune.choice([25, 50, 75, 100]),
-            "no_repeat_ngram_size": tune.choice([1,2,3])
-        })
     
-    print("Best config: ", analysis.get_best_config(metric="total_score", mode="max"))
+    bohb_hyperband = HyperBandForBOHB(time_attr="training_iteration", max_t=100, reduction_factor=4, stop_last_trials=False)
+
+    bohb_search = TuneBOHB(max_concurrent=4)
+
+    analysis = tune.run(training_function,
+                        name="bohb_test",
+                        config=config,
+                        scheduler=bohb_hyperband,
+                        search_alg=bohb_search,
+                        num_samples=10,
+                        stop={"training_iteration": 100},
+                        metric="total_score",
+                        mode="max", 
+                        resources_per_trial={'gpu': 1},
+                        callbacks = [CSVLoggerCallback(), JsonLoggerCallback()])
+
+    print("Best hyperparameters found were: ", analysis.best_config)
+    
+#     analysis = tune.run(
+#         training_function, resources_per_trial={'gpu': 1},
+#         callbacks = [CSVLoggerCallback(), JsonLoggerCallback()],
+#         config=config)
+    
+#     print("Best config: ", analysis.get_best_config(metric="total_score", mode="max"))
     
     
 #     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
