@@ -40,7 +40,10 @@ if __name__ == "__main__":
     args = parser.parse_args(serialize_config(config))
 
     fx_dm = RaceDataModule(args, collate_fn)
-    fx_model = RaceModule.load_from_checkpoint("models/ckpts/t5.ckpt")
+#     fx_model = RaceModule.load_from_checkpoint("models/ckpts/t5.ckpt")
+    #fx_model.setup_tune(top_p = 0.95, top_k = 50, no_repeat_ngram_size = 2)
+#     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
+
     
         # Trainer:
     trainer = pl.Trainer.from_argparse_args(args)
@@ -51,9 +54,9 @@ if __name__ == "__main__":
     def training_function(config):
     # Hyperparameters
         top_p, top_k, no_repeat_ngram_size = config["top_p"], config["top_k"], config["no_repeat_ngram_size"]
-        fx_model = RaceModule.load_from_checkpoint("models/ckpts/t5.ckpt")
+        fx_model = RaceModule.load_from_checkpoint("D:/Github/decepticon/project/models/ckpts/t5.ckpt")
         fx_model.setup_tune(top_p = top_p, top_k = top_k, no_repeat_ngram_size = no_repeat_ngram_size)
-        result = trainer.trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
+        result = trainer.test(fx_model, test_dataloaders=fx_dm.val_dataloader())
         
         score = fn_objective(result["bleu_1"], result["bleu_2"], result["bleu_3"], result["bleu_4"], result["meteor"], result["rouge_l"])
         # Feed the score back back to Tune.

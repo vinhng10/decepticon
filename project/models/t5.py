@@ -73,7 +73,7 @@ class RaceModule(pl.LightningModule):
         labels[labels == self.hparams.padding_token] = MASK_ID
         return labels
 
-    def generate(self, inputs, use_beam=False, use_sample=False, **kwargs):
+    def generate(self, inputs, use_beam=False, use_sample=True, **kwargs):
         """ Args:
             inputs dict: dict of input
             kwargs: for generation
@@ -189,6 +189,7 @@ class RaceModule(pl.LightningModule):
         """"""
         # [bsz, pred_len]
         try: ## for tuning
+#             "Tunning is ON"
             top_k = self.top_k ##1 75
             top_p = self.top_p ##2 0.9
             no_repeat_ngram_size = self.no_repeat_ngram_size
