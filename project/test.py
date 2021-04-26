@@ -60,7 +60,7 @@ if __name__ == "__main__":
         tune.report(loss=score)
     
     analysis = tune.run(
-        training_function,
+        training_function, resources_per_trial={'gpu': 1},
         config={
             "top_p": tune.grid_search([0.8, 0.85, 0.9, 0.95, 0.97, 0.99]),
             "top_k": tune.choice([25, 50, 75, 100]),
