@@ -3,6 +3,7 @@ import yaml
 import torch
 import numpy as np
 from argparse import ArgumentParser
+import gc
 from ray import tune
 from ray.tune.logger import CSVLoggerCallback, JsonLoggerCallback
 from ray.tune.schedulers.hb_bohb import HyperBandForBOHB
@@ -68,6 +69,8 @@ if __name__ == "__main__":
         
         score = fn_objective(result["bleu_1"], result["bleu_2"], result["bleu_3"], result["bleu_4"], result["meteor"], result["rouge_l"])
         # Feed the score back back to Tune.
+        del fx_model
+        gc.collect()
         tune.report(total_score=score)
         
         
@@ -78,17 +81,17 @@ if __name__ == "__main__":
             }
     
     
-    bohb_hyperband = HyperBandForBOHB(time_attr="training_iteration", max_t=50, reduction_factor=4, stop_last_trials=False)
+    bohb_hyperband = HyperBandForBOHB(time_attr="training_iteration", max_t=150, reduction_factor=3) #stop_last_trials=False)
 
-    bohb_search = TuneBOHB(max_concurrent=4)
+    bohb_search = TuneBOHB(max_concurrent=10)
 
     analysis = tune.run(training_function,
                         name="bohb_test",
                         config=config,
                         scheduler=bohb_hyperband,
                         search_alg=bohb_search,
-                        num_samples=20,
-                        stop={"training_iteration": 50},
+                        num_samples=15,
+                        #stop={"training_iteration": 100},
                         metric="total_score",
                         mode="max", 
                         resources_per_trial={'gpu': 1},
