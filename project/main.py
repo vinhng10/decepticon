@@ -52,8 +52,8 @@ if __name__ == "__main__":
         monitor="val_loss"
     )
     earlystopping = EarlyStopping(monitor='val_loss',
-                                  min_delta=0.05,
-                                  patience=3,
+                                  min_delta=0.01,
+                                  patience=5,
                                   verbose=False,
                                   mode="min")
 
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         callbacks=[earlystopping, LearningRateMonitor()],
         logger=logger
     )
-    trainer.fit(fx_model, fx_dm)
+#     trainer.fit(fx_model, fx_dm)
     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
 
     # fx_infer = RaceModule.load_from_checkpoint(checkpoint.best_model_path)

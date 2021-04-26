@@ -58,7 +58,7 @@ def t5_dis_collate_fn(batch, tokenizer):
     distractor = []
     for item in batch:
         context.append(
-            " ".join(["[ANS]", item["answer"], "[QUE]", item["question"], "[CON>]", item["article"]]))
+            " ".join(["[ANS]", item["answer"], "[QUE]", item["question"], "[CON]", item["article"]]))
         indx = np.random.randint(low=0, high=len(item["distractors"]), size=1)[0]
         distractor.append(item["distractors"][indx])
 
