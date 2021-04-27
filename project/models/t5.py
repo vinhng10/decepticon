@@ -22,9 +22,9 @@ class RaceModule(pl.LightningModule):
                             help="specify it in a form X.XX")
         parser.add_argument("--padding_token", type=int, default=0,
                             help="don't change it")
-        parser.add_argument("--tokenizer_len", type=int, default=32102,
+        parser.add_argument("--tokenizer_len", type=int, default=32104,
                             help="don't touch it")
-        parser.add_argument("--seed", default=2020, type=float)
+        parser.add_argument("--seed", default=1234, type=float)
         parser.add_argument("--weight_decay", default=5e-5, type=float)
         parser.add_argument("--learning_rate", default=1e-4, type=float)
 
@@ -56,9 +56,16 @@ class RaceModule(pl.LightningModule):
             try:
                 self.model.resize_token_embeddings(self.hparams.tokenizer_len)
             except:
-                self.model.resize_token_embeddings(32102)
+                self.model.resize_token_embeddings(32104)
         else:
             raise NotImplementedError
+            
+            
+    def setup_tune(self, top_k: int = 50, top_p: float = 0.95, no_repeat_ngram_size: int = 2):
+        """"""
+        self.top_k = top_k ##1 75
+        self.top_p = top_p ##2 0.9
+        self.no_repeat_ngram_size = no_repeat_ngram_size
 
     def mask_label_padding(self, labels):
         """"""
@@ -66,7 +73,7 @@ class RaceModule(pl.LightningModule):
         labels[labels == self.hparams.padding_token] = MASK_ID
         return labels
 
-    def generate(self, inputs, use_beam=False, use_sample=False, **kwargs):
+    def generate(self, inputs, use_beam=False, use_sample=True, **kwargs):
         """ Args:
             inputs dict: dict of input
             kwargs: for generation
@@ -132,6 +139,7 @@ class RaceModule(pl.LightningModule):
         # Generations:
         generations = self.generate(
             inputs=x,
+            use_beam = False,
             use_sample=True,
             max_length=64,
         )
@@ -143,7 +151,7 @@ class RaceModule(pl.LightningModule):
 
         references = [
             self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in x["input_ids"]
+            for target in y["input_ids"]
         ]
 
         # Compute metrics:
@@ -158,8 +166,8 @@ class RaceModule(pl.LightningModule):
     def generate_with_beam(self, inputs,
                            num_beams: int = 6,
                            no_repeat_ngram_size: int = 2,
-                           max_length: int = 30,
-                           early_stopping: bool = False,
+                           max_length: int = 64,
+                           early_stopping: bool = True,
                            num_beam_groups: int = 2):
         """"""
 
@@ -173,17 +181,26 @@ class RaceModule(pl.LightningModule):
         return generated
 
     def generate_with_sampling(self, inputs,
-                               top_k: int = 75,
-                               top_p: float = 0.9,
-                               max_length: int = 30,
+                               top_k: int = 50, ##1 75
+                               top_p: float = 0.95, ##2 0.9
+                               max_length: int = 64,
                                do_sample: bool = True,
                                no_repeat_ngram_size: int = 2):
         """"""
         # [bsz, pred_len]
+        try: ## for tuning
+#             "Tunning is ON"
+            top_k = self.top_k ##1 75
+            top_p = self.top_p ##2 0.9
+            no_repeat_ngram_size = self.no_repeat_ngram_size
+        except:
+            pass
+        
         generated = self.model.generate(**inputs, # context -> answer + article
                                         max_length=max_length,
                                         do_sample=do_sample,
                                         no_repeat_ngram_size=no_repeat_ngram_size,
+                                        #repetition_penalty = 0.5,
                                         top_k=top_k,
                                         top_p=top_p)
 

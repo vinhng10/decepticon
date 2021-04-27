@@ -29,7 +29,7 @@ def t5_collate_fn(batch, tokenizer):
     context = []
     questions = []
     for item in batch:
-        context.append(" ".join(["<ANS>", item["answer"], "<CON>", item["article"]]))
+        context.append(" ".join(["[ANS]", item["answer"], "[CON]", item["article"]]))
         questions.append(item["question"])
     context = tokenizer(text=context,
                         padding=True,
@@ -58,7 +58,7 @@ def t5_dis_collate_fn(batch, tokenizer):
     distractor = []
     for item in batch:
         context.append(
-            " ".join(["<ANS>", item["answer"], "<QUE>", item["question"], "<CON>", item["article"]]))
+            " ".join(["[ANS]", item["answer"], "[QUE]", item["question"], "[CON]", item["article"]]))
         indx = np.random.randint(low=0, high=len(item["distractors"]), size=1)[0]
         distractor.append(item["distractors"][indx])
 
@@ -143,6 +143,7 @@ def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_l
             print("CON:", con_str)
             print("TGT:", tgt_str)
             print("OUT:", out_str)
+
 
 
 def serialize_config(config: Dict) -> List[str]:
