@@ -121,7 +121,7 @@ class RaceModule(pl.LightningModule):
             Returns:
                 id_seqs (bsz, pred_len)
         """
-        target = torch.LongTensor(self.tokenizer.cls_token * self.hparams.batch_size).unsqueeze(1).to(inputs['input_ids'].device)
+        target = torch.LongTensor([101] * self.hparams.batch_size).unsqueeze(1).to(inputs['input_ids'].device)
         for i in range(pred_len):
             output = self.forward(inputs, target, memory_key_padding_mask=memory_key_padding_mask).permute((0, 2, 1))  # [bsz, seq_len, vsz]
             output = self.top_p_filtering(output[:, i:i + 1, :], top_p=self.hparams.top_p)
