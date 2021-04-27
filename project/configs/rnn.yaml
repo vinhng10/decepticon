@@ -1,14 +1,17 @@
-data_path: "data/RACE_processed"
-batch_size: 32
+data_path: "D:Github/decepticon/Processed_New"
+batch_size: 1
 num_workers: 0
-top_p: 0.3
+top_p: 0.8
 hidden_size: 128
-learning_rate: 1e-05
+bidirectional: True
+embed_dim: 128
+num_layers: 1
+learning_rate: 5e-04
 special_tokens:
     - "[CON]"
     - "[QUE]"
     - "[ANS]"
     - "[DIS]"
 gpus: 1
-max_epochs: 1
+max_epochs: 5
 check_val_every_n_epoch: 1

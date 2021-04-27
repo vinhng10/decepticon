@@ -6,14 +6,14 @@ from transformers import AutoTokenizer
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 # Pytorch Lightning Import:
 import pytorch_lightning as pl
 
 # Internal Import:
-from project.metrics.metrics import Input, Metrics
+from metrics.metrics import Input, Metrics
 
 
 class RaceModule(pl.LightningModule):
@@ -23,8 +23,8 @@ class RaceModule(pl.LightningModule):
         """"""
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
         parser.add_argument("--embed_dim", type=int, default=256)
-        parser.add_argument("--bidirectional", type=bool, default=False)
-        parser.add_argument("--dropout", type=float, default=0)
+        parser.add_argument("--bidirectional", type=bool, default=True)
+        parser.add_argument("--dropout", type=float, default=0.05)
         parser.add_argument("--top_p", type=float, default=0.5)
         parser.add_argument("--hidden_size", type=int, default=256,
                             help="hidden_sz of the GRU")
@@ -196,9 +196,10 @@ class RaceModule(pl.LightningModule):
             return torch.cat(outputs, dim=1), hidden
 
     def configure_optimizers(self):
-        optimizer = Adam(self.parameters(), lr=self.hparams.learning_rate)
+        optimizer = AdamW(self.parameters(), lr=self.hparams.learning_rate, weight_decay= 1e-5)
         scheduler = ReduceLROnPlateau(optimizer, mode="min", factor=1e-1, patience=2, verbose=True)
         return {'optimizer': optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_loss'}
+    
 
     def training_step(self, batch, batch_idx):
         x, y = self.batch_fn(batch)
