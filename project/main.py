@@ -17,7 +17,8 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from data.data import RaceDataModule
 from utils.utils import (
     t5_collate_fn, t5_dis_collate_fn,
-    transformer_collate_fn,
+    transformer_test_batch_fn, rnn_test_batch_fn,
+    transformer_collate_fn,default_collate_fn,
     rnn_batch_fn, rnn_dis_batch_fn,
     display_result_as_string,
     serialize_config
@@ -28,11 +29,11 @@ if __name__ == "__main__":
 
     # Choose the model
     # from models.transformer import RaceModule
-    # from models.rnn import RaceModule
-    from models.t5 import RaceModule
+    from models.rnn import RaceModule
+    # from models.t5 import RaceModule
 
     batch_fn = None
-    collate_fn = t5_collate_fn
+    collate_fn = default_collate_fn
 
     pl.seed_everything(1234)
 
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     parser = RaceDataModule.add_model_specific_args(parser)
     parser = RaceModule.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)
-    config = yaml.load(open("project/configs/t5.yaml"), Loader=yaml.FullLoader)
+    config = yaml.load(open("configs/rnn.yaml"), Loader=yaml.FullLoader)
     args = parser.parse_args(serialize_config(config))
 
     fx_dm = RaceDataModule(args, collate_fn)
@@ -75,9 +76,9 @@ if __name__ == "__main__":
     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
 
     fx_dm.setup()
-    fx_infer = RaceModule.load_from_checkpoint("models/ckpts/fx-epoch=00-val_loss=5.6027322.ckpt")
+    fx_infer = RaceModule.load_from_checkpoint(checkpoint.best_model_path)
     fx_infer.eval()
 
-    test_batch_fn = lambda batch: (batch['answers']['input_ids'], torch.cat([batch['answers']['input_ids'],batch['articles']['input_ids']], dim=1), batch['questions']['input_ids'])
+    test_batch_fn = rnn_test_batch_fn
     display_result_as_string(fx_dm.tokenizer, fx_dm.test_dataloader(),
                              fx_infer, test_batch_fn)
