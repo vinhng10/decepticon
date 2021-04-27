@@ -83,7 +83,7 @@ class RaceModule(pl.LightningModule):
         self.save_hyperparameters(hparams)
 
         # Tokenizer:
-        self.tokenizer = AutoTokenizer.from_pretrained(hparams.pretrained_model)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
 
         # Metrics:
         self.metrics = Metrics()
