@@ -3,6 +3,10 @@ import numpy as np
 from typing import List, Dict
 
 
+rnn_test_batch_fn = lambda batch: (torch.cat([batch['answers']['input_ids'],batch['articles']['input_ids']], dim=1)[:2,:], torch.cat([batch['answers']['input_ids'],batch['articles']['input_ids']], dim=1)[:2,:], batch['questions']['input_ids'])
+transformer_test_batch_fn = lambda batch: (batch['inputs']['input_ids'], {k:v[:2,:] for k, v in batch['inputs'].items()}, batch['targets']['input_ids'])
+
+
 def default_collate_fn(batch, tokenizer):
     """"""
     articles = []
@@ -122,7 +126,7 @@ def rnn_dis_batch_fn(batch):
     return x, y
 
 
-def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_len=32):
+def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_len=32, sample_num=1, f=None):
     """
     Args:
         test_batch_fc: function making batch into variables con and tgt,
@@ -135,15 +139,24 @@ def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_l
             out = model.generate(x, pred_len=pred_len)
             con = con[0, :].long().numpy()
             tgt = tgt[0, :].long().numpy()
-            out = out[0, :].long().numpy()
             con_str = ' '.join(tokenizer.convert_ids_to_tokens(con, True))
             tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt, True))
-            out_str = ' '.join(tokenizer.convert_ids_to_tokens(out, True))
+            if f:
+              f.write("CON:"+con_str+'\n')
+              f.write("TGT:"+tgt_str+'\n')
+              f.write("OUT:"+out_str+'\n')
+
             print("\n============================")
             print("CON:", con_str)
             print("TGT:", tgt_str)
-            print("OUT:", out_str)
-
+            for i in range(sample_num):
+                sample = out[i][0, :].long().numpy()
+                out_str = ' '.join(tokenizer.convert_ids_to_tokens(sample, True))
+                if f:
+                    f.write("OUT%d:"%i + out_str + '\n')
+                print("OUT%d:"%i, out_str)
+            if f:
+                f.write('=======================\n')
 
 
 def serialize_config(config: Dict) -> List[str]:
