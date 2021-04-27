@@ -308,6 +308,7 @@ class RaceDataModule(LightningDataModule):
             shuffle=False,
             num_workers=self.hparams.num_workers,
             pin_memory=True,
+            drop_last=True,
             collate_fn=partial(self.collate_fn, tokenizer=self.tokenizer),
         )
         return self.test_loader
