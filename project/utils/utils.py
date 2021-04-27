@@ -131,8 +131,8 @@ def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_l
     """
     with torch.no_grad():
         for batch in dataloader:
-            con, tgt = test_batch_fc(batch)
-            out = model.generate(con, pred_len=pred_len)
+            con, x, tgt = test_batch_fc(batch)
+            out = model.generate(x, pred_len=pred_len)
             con = con[0, :].long().numpy()
             tgt = tgt[0, :].long().numpy()
             out = out[0, :].long().numpy()
@@ -140,7 +140,7 @@ def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_l
             tgt_str = ' '.join(tokenizer.convert_ids_to_tokens(tgt, True))
             out_str = ' '.join(tokenizer.convert_ids_to_tokens(out, True))
             print("\n============================")
-            print("ANS:", con_str)
+            print("CON:", con_str)
             print("TGT:", tgt_str)
             print("OUT:", out_str)
 
