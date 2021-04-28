@@ -5,9 +5,13 @@ import numpy as np
 from argparse import ArgumentParser
 import gc
 from ray import tune
+from ray.tune import CLIReporter
+from ray.tune.schedulers import ASHAScheduler, AsyncHyperBandScheduler
+from ray.tune.suggest.hyperopt import HyperOptSearch
+
 from ray.tune.logger import CSVLoggerCallback, JsonLoggerCallback
-from ray.tune.schedulers.hb_bohb import HyperBandForBOHB
-from ray.tune.suggest.bohb import TuneBOHB
+from ray.tune.integration.pytorch_lightning import TuneReportCallback, \
+    TuneReportCheckpointCallback
 import os
 
 # Pytorch Lightning Import:
@@ -45,15 +49,12 @@ if __name__ == "__main__":
     args = parser.parse_args(serialize_config(config))
 
     fx_dm = RaceDataModule(args, collate_fn)
-#     fx_model = RaceModule.load_from_checkpoint("models/ckpts/t5.ckpt")
-    #fx_model.setup_tune(top_p = 0.95, top_k = 50, no_repeat_ngram_size = 2)
-#     trainer.test(fx_model, test_dataloaders=fx_dm.test_dataloader())
+    fx_dm.setup()
 
     
         # Trainer:
-    trainer = pl.Trainer.from_argparse_args(args)
+    trainer = pl.Trainer.from_argparse_args(args, limit_test_batches = 0.5)
     
-    fx_dm.setup()
     
     ## I had to put it here 
     def fn_objective(b1, b2, b3, b4, m, r):
@@ -61,10 +62,10 @@ if __name__ == "__main__":
 
     def training_function(config):
     # Hyperparameters
-        #top_p, top_k, no_repeat_ngram_size = config["top_p"], config["top_k"]#, config["no_repeat_ngram_size"]
-        top_p, top_k = config["top_p"], config["top_k"]#, config["no_repeat_ngram_size"]
+        top_p, top_k, no_repeat_ngram_size = config["top_p"], config["top_k"], config["no_repeat_ngram_size"]
+        #top_p, top_k = config["top_p"], config["top_k"]#, config["no_repeat_ngram_size"]
         fx_model = RaceModule.load_from_checkpoint("D:/Github/decepticon/project/models/ckpts/t5.ckpt")
-        fx_model.setup_tune(top_p = top_p, top_k = top_k, no_repeat_ngram_size = 2)
+        fx_model.setup_tune(top_p = top_p, top_k = top_k, no_repeat_ngram_size = 2, num_samples = 5)
         result = trainer.test(fx_model, test_dataloaders=fx_dm.val_dataloader())
         result = result[0]
         
@@ -77,27 +78,27 @@ if __name__ == "__main__":
         
     config={
             "top_p": tune.uniform(0.80, 0.999),
-            "top_k": tune.randint(30, 100)
-            #"no_repeat_ngram_size": tune.randint(0,4)
+            "top_k": tune.choice([50, 60, 70, 80, 90, 100]),
+            "no_repeat_ngram_size": tune.choice([0,1,2,3])
             }
-    
-    
-    bohb_hyperband = HyperBandForBOHB(time_attr="training_iteration", max_t=100, reduction_factor=2) #stop_last_trials=False)
+    scheduler = ASHAScheduler(time_attr='training_iteration', grace_period=2)
+    hyper = HyperOptSearch(metric="total_score", mode="max")
 
-    bohb_search = TuneBOHB(max_concurrent=5)
+    
 
     analysis = tune.run(training_function,
-                        name="bohb_test",
+                        name="sample_tune",
                         config=config,
-                        scheduler=bohb_hyperband,
-                        search_alg=bohb_search,
-                        num_samples=12,
+                        scheduler=scheduler,
+                        num_samples=15,
                         metric="total_score",
                         mode="max", 
                         resources_per_trial={'gpu': 1},
+                        search_alg=hyper,
                         callbacks = [CSVLoggerCallback(), JsonLoggerCallback()])
 
     print("Best hyperparameters found were: ", analysis.best_config)
+
     
 #     analysis = tune.run(
 #         training_function, resources_per_trial={'gpu': 1},
