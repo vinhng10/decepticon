@@ -75,21 +75,22 @@ if __name__ == "__main__":
         gc.collect()
         tune.report(total_score=score)
         
+    current_best_params = [{"top_k": 50,
+        "top_p": 0.95,
+        "no_repeat_ngram_size": 2}]
         
     config={
             "top_p": tune.uniform(0.80, 0.999),
-            "top_k": tune.choice([50, 60, 70, 80, 90, 100]),
+            "top_k": tune.choice([10,20, 30, 50, 70, 90, 100]),
             "no_repeat_ngram_size": tune.choice([0,1,2,3])
             }
-    scheduler = ASHAScheduler(time_attr='training_iteration', grace_period=2)
-    hyper = HyperOptSearch(metric="total_score", mode="max")
+    hyper = HyperOptSearch(metric="total_score", mode="max", points_to_evaluate=current_best_params)
 
     
 
     analysis = tune.run(training_function,
                         name="sample_tune",
                         config=config,
-                        scheduler=scheduler,
                         num_samples=15,
                         metric="total_score",
                         mode="max", 

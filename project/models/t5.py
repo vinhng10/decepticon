@@ -142,7 +142,7 @@ class RaceModule(pl.LightningModule):
             inputs=x,
             use_beam = False,
             use_sample=True,
-            max_length=64,
+            max_length=32,
         )
         try:
             expand_size = self.num_samples
@@ -189,7 +189,7 @@ class RaceModule(pl.LightningModule):
     def generate_with_sampling(self, inputs,
                                top_k: int = 50, ##1 75
                                top_p: float = 0.95, ##2 0.9
-                               max_length: int = 64,
+                               max_length: int = 32,
                                do_sample: bool = True,
                                no_repeat_ngram_size: int = 2,
                                num_samples = 1):
