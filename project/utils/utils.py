@@ -148,7 +148,7 @@ def display_result_as_string_(tokenizer, dataloader, model, test_batch_fc, pred_
             print("TGT:", tgt_str)
             print("OUT:", out_str)
 
-def display_result_as_string(tokenizer, ans, output, tgt):
+def display_result_as_string(tokenizer, ans, output, tgt, skip_special = False):
     """
     Args:
         vocab dictionary of [index, word]
@@ -165,9 +165,10 @@ def display_result_as_string(tokenizer, ans, output, tgt):
     else:
         output = output[0, :].long().numpy()
     if ans:
-        ans_str = ' '.join(tokenizer.convert_ids_to_tokens(ans, True))
-    tgt_str = tokenizer.decode(tgt, skip_special_tokens=True)
-    out_str = tokenizer.decode(output, skip_special_tokens=True)
+        ans_str = ' '.join(tokenizer.convert_ids_to_tokens(ans, skip_special))
+    tgt_str = tokenizer.decode(tgt, skip_special_tokens=skip_special)
+    out_str = tokenizer.decode(output, skip_special_tokens=skip_special)
+    
     print("\n============================")
     if ans:
         print("ANS:", ans_str)

@@ -5,7 +5,8 @@ import torch
 import pytorch_lightning as pl
 from torch.nn import functional as F
 from transformers import (
-    T5ForConditionalGeneration, T5Config, AutoTokenizer, AdamW
+    T5ForConditionalGeneration, T5Config, AutoTokenizer, AdamW, BertForSequenceClassification
+
 )
 
 from metrics.metrics import Input, Metrics
@@ -51,6 +52,9 @@ class RaceModule(pl.LightningModule):
             self.model = T5ForConditionalGeneration(config).from_pretrained(self.hparams.pretrained_model)
             # Tokenizer:
             self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
+            self.tokenizer_ = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
+            self.tokenizer_.add_special_tokens({"additional_special_tokens": ["[CON]","[QUE]","[ANS]","[DIS]"]})
+            
             # Metrics:
             self.metrics = Metrics()
             try:
@@ -142,11 +146,11 @@ class RaceModule(pl.LightningModule):
             inputs=x,
             use_beam = False,
             use_sample=True,
-            max_length=32,
+            max_length=64,
         )
         try:
-            expand_size = self.num_samples
-            y["input_ids"] = torch.repeat_interleave(y["input_ids"], expand_size, dim = 0)
+            if self.num_samples > 1:
+                y["input_ids"] = torch.repeat_interleave(y["input_ids"], expand_size, dim = 0)
         except:
             pass
 
@@ -159,7 +163,7 @@ class RaceModule(pl.LightningModule):
             self.tokenizer.decode(target, skip_special_tokens=True)
             for target in y["input_ids"]
         ]
-
+        
         # Compute metrics:
         inputs = Input(predictions=predictions, references=references)
         metrics = self.metrics.compute_metrics(inputs)
@@ -189,7 +193,7 @@ class RaceModule(pl.LightningModule):
     def generate_with_sampling(self, inputs,
                                top_k: int = 50, ##1 75
                                top_p: float = 0.95, ##2 0.9
-                               max_length: int = 32,
+                               max_length: int = 64,
                                do_sample: bool = True,
                                no_repeat_ngram_size: int = 2,
                                num_samples = 1):
@@ -210,8 +214,10 @@ class RaceModule(pl.LightningModule):
                                         no_repeat_ngram_size=no_repeat_ngram_size,
                                         num_return_sequences=num_samples,
                                         top_k=top_k,
-                                        top_p=top_p)
-
-
+                                        top_p=top_p)  
         return generated
-
+    
+#     def setup_judge(self, judge_path):
+#         self.with_judge = True
+#         self.judge = BertForSequenceClassification.from_pretrained(hparams.pretrained_eval_model)
+#         self.tokenizer = AutoTokenizer.from_pretrained("iarfmoose/bert-base-cased-qa-evaluator")
