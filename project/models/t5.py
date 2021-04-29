@@ -206,3 +206,11 @@ class RaceModule(pl.LightningModule):
 
         return generated
 
+    def generate_question(self, article, answer, pred_len=64):
+        tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
+        tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
+        context = " ".join(['[ANS]', answer, '[CON]', article])
+        inputs = tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
+        question = self.generate(inputs, use_sample=True)
+
+        return tokenizer.decode(question.squeeze(), True)

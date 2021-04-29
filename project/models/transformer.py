@@ -121,12 +121,14 @@ class RaceModule(pl.LightningModule):
             Returns:
                 id_seqs (bsz, pred_len)
         """
-        target = torch.LongTensor([101] * self.hparams.batch_size).unsqueeze(1).to(inputs['input_ids'].device)
+        target = torch.LongTensor([101] * inputs['input_ids'].shape[0]).unsqueeze(1).to(inputs['input_ids'].device)
         for i in range(pred_len):
             output = self.forward(inputs, target, memory_key_padding_mask=memory_key_padding_mask).permute((0, 2, 1))  # [bsz, seq_len, vsz]
             output = self.top_p_filtering(output[:, i:i + 1, :], top_p=self.hparams.top_p)
             prob = F.softmax(output, dim=2).squeeze(1)
             token = torch.multinomial(prob, 1)
+            if all(token == self.tokenizer.pad_token_id):
+                break
             target = torch.cat([target, token], dim=1)
         return target
 
@@ -237,4 +239,16 @@ class RaceModule(pl.LightningModule):
 
         return metrics
 
+    def generate_question(self, article, answer, pred_len=64):
+        context = " ".join([answer,self.tokenizer.sep_token, article])
+        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
+        question = self.generate(inputs, pred_len)
 
+        return self.tokenizer.decode(question.squeeze(), True)
+
+    def generate_distractor(self, article, answer, question,  pred_len=64):
+        context = " ".join([answer, self.tokenizer.sep_token, article, self.tokenizer.sep_token, question])
+        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
+        distractors = self.generate(inputs, pred_len)
+
+        return self.tokenizer.decode(distractors.squeeze(), False)
