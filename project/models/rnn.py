@@ -142,18 +142,19 @@ class RaceModule(pl.LightningModule):
         output = self.de_fc(output)
         return output
 
-    def generate(self, enc_input, pred_len, sample_num=1):
+    def generate(self, enc_input, pred_len, sample_num=1, top_p=0.95):
         """ Args:
                 enc_input (batch, seq_len): Encoder Input seqs.
                 pred_len (int): Length of predicted sequence.
                 sample_num (int): Number of generation.
+                top_p (float): top_p
 
             Returns:
                 outputs list of (batch, pred_len)
         """
-        def generate_token(dec_inputs, hidden, sample_num):
+        def generate_token(dec_inputs, hidden, sample_num, top_p):
             output = self.decode(dec_inputs, hidden)
-            output = self.top_p_filtering(output, top_p=self.hparams.top_p)
+            output = self.top_p_filtering(output, top_p=top_p)
             prob = F.softmax(output, dim=2).squeeze(1)
             res = torch.multinomial(prob, sample_num)
             return res
@@ -161,13 +162,13 @@ class RaceModule(pl.LightningModule):
         _, hidden = self.encode(enc_input)
         bsz = hidden.shape[1]
         dec_init = torch.zeros((bsz, 1), device=hidden.device).long()
-        samples = torch.unbind(generate_token(dec_init, hidden, sample_num), dim=1)
+        samples = torch.unbind(generate_token(dec_init, hidden, sample_num, top_p), dim=1)
         outputs = []
         for i in range(sample_num):
             token = samples[i].reshape(bsz, 1) # (bsz, 1)
             tmp = [dec_init, token]
             for _ in range(pred_len-2):
-                token = generate_token(token, hidden, 1) # (bsz, 1)
+                token = generate_token(token, hidden, 1, top_p) # (bsz, 1)
                 if all(token == self.tokenizer.pad_token_id):
                     break
                 tmp.append(token)
@@ -264,4 +265,17 @@ class RaceModule(pl.LightningModule):
 
         return final_metrics
 
+    def generate_question(self, article, answer, pred_len=64, sample_num=1, top_p=0.95):
+        context = " ".join([answer,self.tokenizer.sep_token, article])
+        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")['input_ids']
+        questions = self.generate(inputs, pred_len, sample_num=sample_num, top_p=top_p)
 
+        return [self.tokenizer.decode(question.squeeze(), True) for question in questions]
+
+    def generate_distractor(self, article, answer, question,  pred_len=64, sample_num=1, top_p=0.95):
+        context = " ".join([answer, self.tokenizer.sep_token, article, self.tokenizer.sep_token, question])
+        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")[
+            'input_ids']
+        distractors = self.generate(inputs, pred_len, sample_num=sample_num, top_p=top_p)
+
+        return [self.tokenizer.decode(distractor.squeeze(), False) for distractor in distractors]
