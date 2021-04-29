@@ -105,6 +105,40 @@ def transformer_collate_fn(batch, tokenizer):
     }
 
 
+def transformer_dis_collate_fn(batch, tokenizer):
+    """"""
+    con_token, que_token, ans_token, dis_token = tokenizer.additional_special_tokens
+
+    inputs = []
+    targets = []
+
+    for item in batch:
+        inputs.append(" ".join([item["answer"], tokenizer.sep_token, item['question'], tokenizer.sep_token, item["article"]]))
+        targets.append(" ".join([tokenizer.sep_token.join(item["distractors"])]))
+
+    return {
+        "inputs": tokenizer(inputs, padding=True, truncation=True, max_length=512, return_tensors="pt"),
+        "targets": tokenizer(targets, padding=True, truncation=True, return_tensors="pt"),
+    }
+
+
+def rnn_dis_collate_fn(batch, tokenizer):
+    """"""
+    con_token, que_token, ans_token, dis_token = tokenizer.additional_special_tokens
+
+    inputs = []
+    targets = []
+
+    for item in batch:
+        inputs.append(" ".join([item["answer"], tokenizer.sep_token, item['question'], tokenizer.sep_token, item["article"]]))
+        targets.append(" ".join([tokenizer.sep_token.join(item["distractors"])]))
+
+    return {
+        "inputs": tokenizer(inputs, padding=True, truncation=True, max_length=512, return_tensors="pt"),
+        "targets": tokenizer(targets, padding=True, truncation=True, return_tensors="pt"),
+    }
+
+
 def rnn_batch_fn(batch):
     """
     Description: from batch to x, y
@@ -117,12 +151,7 @@ def rnn_batch_fn(batch):
 
 
 def rnn_dis_batch_fn(batch):
-    """"""
-    art = batch['articles']['input_ids']
-    que = batch['questions']['input_ids']
-    ans = batch['answers']['input_ids']
-    dis = batch["distractors"]['input_ids']
-    x, y = torch.cat([que, ans, art], dim=1).long(), dis.long()
+    x, y = batch['inputs']['input_ids'], batch['targets']['input_ids'],
     return x, y
 
 
