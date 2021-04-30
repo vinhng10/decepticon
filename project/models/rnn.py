@@ -14,9 +14,9 @@ import pytorch_lightning as pl
 
 # Internal Import:
 from metrics.metrics import Input, Metrics
+from models.base import RaceBaseModel
 
-
-class RaceModule(pl.LightningModule):
+class RaceModule(RaceBaseModel):
 
     @staticmethod
     def add_model_specific_args(parent_parser):
@@ -38,56 +38,11 @@ class RaceModule(pl.LightningModule):
                             help="The total number of training steps.")
         return parser
 
-    @staticmethod
-    def default_batch_fn(batch):
-        """
-        Description: from batch to x, y
-        """
-        art, que, ans = batch['articles']['input_ids'], batch['questions']['input_ids'], batch['answers']['input_ids']
-        x, y = torch.cat([ans, art], dim=1).long(), que.long()
-        return x, y
-
-    @staticmethod
-    def top_p_filtering(score, top_p):
-        """ Args:
-                score (bsz, vocab_size): output of the last layer
-                top_p float value: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
-            Returns:
-                score (bsz, vocab_size): output after redistributing the prob with top-p
-        """
-        sorted_logits, sorted_indices = torch.sort(score, descending=True)
-        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-        # Remove tokens with cumulative probability above the threshold
-        sorted_indices_to_remove = cumulative_probs >= top_p
-        # Shift the indices to the right to keep also the first token above the threshold
-        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-        sorted_indices_to_remove[..., 0] = 0
-
-        indices_to_remove = torch.zeros_like(sorted_indices_to_remove, dtype=sorted_indices_to_remove.dtype).scatter_(
-            dim=-1, index=sorted_indices, src=sorted_indices_to_remove)
-        score[indices_to_remove] = -float('Inf')
-        return score
-
     def __init__(self, hparams, batch_fn=None):
         """
         :param batch_fn: function to process batch
         """
-        super(RaceModule, self).__init__()
-
-        if batch_fn:
-            self.batch_fn = batch_fn
-        else:
-            self.batch_fn = self.default_batch_fn
-
-        self.hparams = hparams
-        self.save_hyperparameters(hparams)
-
-        # Tokenizer:
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
-
-        # Metrics:
-        self.metrics = Metrics()
+        super(RaceModule, self).__init__(hparams, batch_fn)
 
         # Encoder:
         num_directions = 2 if self.hparams.bidirectional else 1
@@ -123,7 +78,7 @@ class RaceModule(pl.LightningModule):
 
     def encode(self, inputs, hidden=None):
         """ Args:
-                input (batch, seq_len): Input sequence.
+                inputs (batch, seq_len): Input sequence.
                 hidden (num_layers*num_directions, batch, hidden_size): Initial states.
 
             Returns:
@@ -138,6 +93,13 @@ class RaceModule(pl.LightningModule):
         return outputs, hidden.contiguous()
 
     def decode(self, inputs, context):
+        """ Args:
+                inputs (batch, seq_len): Input sequence.
+                context (num_layers*num_directions, batch, hidden_size): Initial states.
+
+            Returns:
+                output (batch, seq_len, num_directions*hidden_size): Outputs at every step.
+        """
         inputs = self.embedding(inputs)
         output, hidden = self.de_gru(inputs, context)
         output = self.de_fc(output)
@@ -145,7 +107,7 @@ class RaceModule(pl.LightningModule):
 
     def generate(self, enc_input, pred_len, sample_num=1, top_p=0.95):
         """ Args:
-                enc_input (batch, seq_len): Encoder Input seqs.
+                enc_input dict: Encoder Input dict with keys {"input_ids", "attention_mask", "token_type"}.
                 pred_len (int): Length of predicted sequence.
                 sample_num (int): Number of generation.
                 top_p (float): top_p
@@ -160,7 +122,7 @@ class RaceModule(pl.LightningModule):
             res = torch.multinomial(prob, sample_num)
             return res
 
-        _, hidden = self.encode(enc_input)
+        _, hidden = self.encode(enc_input['input_ids'])
         bsz = hidden.shape[1]
         dec_init = torch.zeros((bsz, 1), device=hidden.device).long()
         samples = torch.unbind(generate_token(dec_init, hidden, sample_num, top_p), dim=1)
@@ -208,7 +170,8 @@ class RaceModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = self.batch_fn(batch)
-        y_hat, _ = self(x, y)
+        x, y = x['input_ids'], y['input_ids']
+        y_hat, _ = self.forward(x, y)
         y_hat = y_hat.reshape(-1, y_hat.shape[-1])
         y = y.reshape(-1)
         loss = F.nll_loss(y_hat, y, ignore_index=0)
@@ -225,58 +188,3 @@ class RaceModule(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         self.log("val_loss", val_loss, prog_bar=True, logger=True)
-
-    def test_step(self, batch, batch_idx):
-        # Prepare data:
-        inputs, targets = self.batch_fn(batch)
-
-        # Generations:
-        generations_list = self.generate(inputs, pred_len=64, sample_num=2)
-
-        # Compute metrics:
-
-        references = [
-            self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in targets
-        ]
-
-        # Multiple generations:
-
-        metrics = ['bleu_1', 'bleu_2', 'bleu_3', 'bleu_4', 'meteor', 'rouge_l']
-        final_metrics = dict(zip(metrics, [0]*len(metrics)))
-
-        for generations in generations_list:
-
-            predictions = [
-                self.tokenizer.decode(generation, skip_special_tokens=True)
-                for generation in generations
-            ]
-
-            inputs = Input(predictions=predictions, references=references)
-            metrics = self.metrics.compute_metrics(inputs)
-
-            for k in metrics:
-                final_metrics[k] += metrics[k]
-
-        for k in metrics:
-            final_metrics[k] /= len(generations_list)
-
-        # Log:
-        self.log_dict(final_metrics)
-
-        return final_metrics
-
-    def generate_question(self, article, answer, pred_len=64, sample_num=1, top_p=0.95):
-        context = " ".join([answer,self.tokenizer.sep_token, article])
-        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")['input_ids']
-        questions = self.generate(inputs, pred_len, sample_num=sample_num, top_p=top_p)
-
-        return [self.tokenizer.decode(question.squeeze(), True) for question in questions]
-
-    def generate_distractor(self, article, answer, question,  pred_len=64, sample_num=1, top_p=0.95):
-        context = " ".join([answer, self.tokenizer.sep_token, article, self.tokenizer.sep_token, question])
-        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")[
-            'input_ids']
-        distractors = self.generate(inputs, pred_len, sample_num=sample_num, top_p=top_p)
-
-        return [self.tokenizer.decode(distractor.squeeze(), False) for distractor in distractors]

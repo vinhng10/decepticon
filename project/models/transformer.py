@@ -15,10 +15,10 @@ from transformers import AutoTokenizer, AutoModel
 from transformers import get_linear_schedule_with_warmup
 
 # Internal Import:
-from project.metrics.metrics import Input, Metrics
+from metrics.metrics import Input, Metrics
+from models.base import RaceBaseModel
 
-
-class RaceModule(pl.LightningModule):
+class RaceModule(RaceBaseModel):
     """ Race Module """
 
     @staticmethod
@@ -41,33 +41,6 @@ class RaceModule(pl.LightningModule):
         return parser
 
     @staticmethod
-    def default_batch_fn(batch):
-        x, y = batch['inputs'], batch['targets'],
-        return x, y
-
-    @staticmethod
-    def top_p_filtering(score, top_p):
-        """ Args:
-                score (bsz, vocab_size): output of the last layer
-                top_p float value: keep the top tokens with cumulative probability >= top_p (nucleus filtering).
-            Returns:
-                score (bsz, vocab_size): output after redistributing the prob with top-p
-        """
-        sorted_logits, sorted_indices = torch.sort(score, descending=True)
-        cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
-
-        # Remove tokens with cumulative probability above the threshold
-        sorted_indices_to_remove = cumulative_probs >= top_p
-        # Shift the indices to the right to keep also the first token above the threshold
-        sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-        sorted_indices_to_remove[..., 0] = 0
-
-        indices_to_remove = torch.zeros_like(sorted_indices_to_remove, dtype=sorted_indices_to_remove.dtype).scatter_(
-            dim=-1, index=sorted_indices, src=sorted_indices_to_remove)
-        score[indices_to_remove] = -float('Inf')
-        return score
-
-    @staticmethod
     def generate_tgt_mask(size):
         """"""
         mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
@@ -75,21 +48,10 @@ class RaceModule(pl.LightningModule):
         return mask
 
     def __init__(self, hparams, batch_fn=None):
-        super(RaceModule, self).__init__()
-        self.hparams = hparams
-        self.save_hyperparameters(hparams)
-
-        if batch_fn:
-            self.batch_fn = batch_fn
-        else:
-            self.batch_fn = self.default_batch_fn
-
-        # Tokenizer:
-        self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
-        self.tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
-
-        # Metrics:
-        self.metrics = Metrics()
+        """
+        :param batch_fn: function to process batch
+        """
+        super(RaceModule, self).__init__(hparams, batch_fn)
 
         # Encoder:
         self.encoder = AutoModel.from_pretrained(self.hparams.pretrained_model)
@@ -130,7 +92,7 @@ class RaceModule(pl.LightningModule):
             if all(token == self.tokenizer.pad_token_id):
                 break
             target = torch.cat([target, token], dim=1)
-        return target
+        return [target]
 
     def forward(self, inputs, target=None, target_key_padding_mask=None, memory_key_padding_mask=None, pred_len=None):
         """ Args:
@@ -181,7 +143,7 @@ class RaceModule(pl.LightningModule):
         # Prepare data:
         inputs, targets = self.batch_fn(batch)
         # Forward pass:
-        generated = self(
+        generated = self.forward(
             inputs=inputs,
             target=targets["input_ids"][:, :-1],
             target_key_padding_mask=targets["attention_mask"][:, :-1] == 0,
@@ -207,48 +169,3 @@ class RaceModule(pl.LightningModule):
         """"""
         val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         self.log("val_loss", val_loss, prog_bar=True, logger=True)
-
-    def test_step(self, batch, batch_idx):
-        """"""
-        # Prepare data:
-        inputs, targets = batch["inputs"], batch["targets"]
-
-        # Generations:
-        generations = self.generate(
-            inputs=inputs,
-            pred_len=64,
-            memory_key_padding_mask=inputs["attention_mask"] == 0
-        )
-
-        predictions = [
-            self.tokenizer.decode(generation, skip_special_tokens=True)
-            for generation in generations
-        ]
-
-        references = [
-            self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in targets["input_ids"]
-        ]
-
-        # Compute metrics:
-        inputs = Input(predictions=predictions, references=references)
-        metrics = self.metrics.compute_metrics(inputs)
-
-        # Log:
-        self.log_dict(metrics)
-
-        return metrics
-
-    def generate_question(self, article, answer, pred_len=64):
-        context = " ".join([answer,self.tokenizer.sep_token, article])
-        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
-        question = self.generate(inputs, pred_len)
-
-        return self.tokenizer.decode(question.squeeze(), True)
-
-    def generate_distractor(self, article, answer, question,  pred_len=64):
-        context = " ".join([answer, self.tokenizer.sep_token, article, self.tokenizer.sep_token, question])
-        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
-        distractors = self.generate(inputs, pred_len)
-
-        return self.tokenizer.decode(distractors.squeeze(), False)

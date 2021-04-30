@@ -16,13 +16,11 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 # Internal Import:
 from data.data import RaceDataModule
 from utils.utils import (
+    serialize_config,
     t5_collate_fn, t5_dis_collate_fn,
-    rnn_dis_collate_fn,
-    transformer_test_batch_fn, rnn_test_batch_fn,
-    transformer_collate_fn,default_collate_fn,
-    rnn_batch_fn, rnn_dis_batch_fn,
+    transformer_collate_fn,default_collate_fn, transformer_test_batch_fn,
+    rnn_collate_fn, rnn_dis_collate_fn,  rnn_test_batch_fn,
     display_result_as_string,
-    serialize_config
 )
 
 

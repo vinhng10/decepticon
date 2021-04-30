@@ -122,6 +122,23 @@ def transformer_dis_collate_fn(batch, tokenizer):
     }
 
 
+def rnn_collate_fn(batch, tokenizer):
+    """"""
+    con_token, que_token, ans_token, dis_token = tokenizer.additional_special_tokens
+
+    inputs = []
+    targets = []
+
+    for item in batch:
+        inputs.append(" ".join([item["answer"], tokenizer.sep_token, item["article"]]))
+        targets.append(item['question'])
+
+    return {
+        "inputs": tokenizer(inputs, padding=True, truncation=True, max_length=512, return_tensors="pt"),
+        "targets": tokenizer(targets, padding=True, truncation=True, return_tensors="pt"),
+    }
+
+
 def rnn_dis_collate_fn(batch, tokenizer):
     """"""
     con_token, que_token, ans_token, dis_token = tokenizer.additional_special_tokens
@@ -139,28 +156,13 @@ def rnn_dis_collate_fn(batch, tokenizer):
     }
 
 
-def rnn_batch_fn(batch):
-    """
-    Description: from batch to x, y
-    """
-    art = batch['articles']['input_ids']
-    que = batch['questions']['input_ids']
-    ans = batch['answers']['input_ids']
-    x, y = torch.cat([ans, art], dim=1).long(), que.long()
-    return x, y
-
-
-def rnn_dis_batch_fn(batch):
-    x, y = batch['inputs']['input_ids'], batch['targets']['input_ids'],
-    return x, y
-
-
 def display_result_as_string(tokenizer, dataloader, model, test_batch_fc, pred_len=32, sample_num=1, f=None):
     """
     Args:
         test_batch_fc: function making batch into variables con and tgt,
         where con is the input of generate and tgt is the target sequence
         pred_len: int, length of generated sequences
+        f: File write to some files
     """
     with torch.no_grad():
         for batch in dataloader:

@@ -10,9 +10,9 @@ from transformers import (
 )
 
 from metrics.metrics import Input, Metrics
+from models.base import RaceBaseModel
 
-
-class RaceModule(pl.LightningModule):
+class RaceModule(RaceBaseModel):
     """ T5 Model """
 
     @staticmethod
@@ -31,20 +31,11 @@ class RaceModule(pl.LightningModule):
 
         return parser
 
-    @staticmethod
-    def default_batch_fn(batch):
-        x, y = batch
-        return x, y
-
     def __init__(self, hparams, batch_fn=None):
-        super(RaceModule, self).__init__()
-        self.hparams = hparams
-        self.save_hyperparameters(hparams)
-
-        if batch_fn:
-            self.batch_fn = batch_fn
-        else:
-            self.batch_fn = self.default_batch_fn
+        """
+        :param batch_fn: function to process batch
+        """
+        super(RaceModule, self).__init__(hparams, batch_fn)
 
         if self.hparams.pretrained_model in ["t5-base","t5-small"]:
             # Model:
@@ -62,8 +53,7 @@ class RaceModule(pl.LightningModule):
                 self.model.resize_token_embeddings(32104)
         else:
             raise NotImplementedError
-            
-            
+
     def setup_tune(self, top_k: int = 50, top_p: float = 0.95, no_repeat_ngram_size: int = 2, num_samples = 5):
         """"""
         self.top_k = top_k ##1 75
@@ -87,9 +77,9 @@ class RaceModule(pl.LightningModule):
         """
         assert use_beam or use_sample, 'Must use one method for generation'
         if use_beam:
-            return self.generate_with_beam(inputs, **kwargs)
+            return [self.generate_with_beam(inputs, **kwargs)]
         if use_sample:
-            return self.generate_with_sampling(inputs, **kwargs)
+            return [self.generate_with_sampling(inputs, **kwargs)]
 
     def forward(self, ids, mask, labels):
         """"""
@@ -135,43 +125,6 @@ class RaceModule(pl.LightningModule):
         val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         self.log("val_loss", val_loss, prog_bar=True, logger=True)
 
-    def test_step(self, batch, batch_idx):
-        """"""
-        # Prepare data:
-        x, y = batch
-
-        # Generations:
-        generations = self.generate(
-            inputs=x,
-            use_beam = False,
-            use_sample=True,
-            max_length=64,
-        )
-        try:
-            if self.num_samples > 1:
-                y["input_ids"] = torch.repeat_interleave(y["input_ids"], expand_size, dim = 0)
-        except:
-            pass
-
-        predictions = [
-            self.tokenizer.decode(generation, skip_special_tokens=True)
-            for generation in generations
-        ]
-
-        references = [
-            self.tokenizer.decode(target, skip_special_tokens=True)
-            for target in y["input_ids"]
-        ]
-
-        # Compute metrics:
-        inputs = Input(predictions=predictions, references=references)
-        metrics = self.metrics.compute_metrics(inputs)
-
-        # Log:
-        self.log_dict(metrics)
-
-        return metrics
-
     def generate_with_beam(self, inputs,
                            num_beams: int = 6,
                            no_repeat_ngram_size: int = 2,
@@ -216,21 +169,25 @@ class RaceModule(pl.LightningModule):
                                         top_p=top_p)
         return generated
 
-
-    def generate_question(self, article, answer, pred_len=64):
+    def generate_sentence(self, article, answer, question=None, pred_len=64, sample_num=1, top_p=0.95, skip_special_tokens=True):
+        """Args:
+            article (str)
+            answer (str)
+            question (str): if not none, generating distractors
+            pred_len (int):  Length of predicted sequence.
+            sample_num (int): number of sample
+            top_p (float): top_p for generation
+            skip_special_tokens (bool): skip special_tokens while decoding
+        :return:
+            list of generated sentences, len(list) = sample_num
+        """
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
         tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
-        context = " ".join(['[ANS]', answer, '[CON]', article])
-        inputs = tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
-        question = self.generate(inputs, use_sample=True)
+        if not question:
+            context = " ".join(['[ANS]', answer, '[QUE]', question, '[CON]', article])
+        else:
+            context = " ".join(['[ANS]', answer, '[CON]', article])
+        inputs = self.tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
+        questions = self.generate(inputs, use_sample=True)
 
-        return tokenizer.decode(question.squeeze(), True)
-
-    def generate_distractor(self, article, answer, question, pred_len=64):
-        tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
-        tokenizer.add_special_tokens({"additional_special_tokens": self.hparams.special_tokens})
-        context = " ".join(['[ANS]', answer, '[QUE]', question, '[CON]', article])
-        inputs = tokenizer([context], padding=True, truncation=True, max_length=512, return_tensors="pt")
-        question = self.generate(inputs, use_sample=True)
-
-        return tokenizer.decode(question.squeeze(), True)
+        return [self.tokenizer.decode(question.squeeze(), skip_special_tokens) for question in questions]
