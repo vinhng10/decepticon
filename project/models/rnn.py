@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_lightning as pl
 
 # Internal Import:
-from project.metrics.metrics import Input, Metrics
+from metrics.metrics import Input, Metrics
 
 
 class RaceModule(pl.LightningModule):
@@ -22,6 +22,8 @@ class RaceModule(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         """"""
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--version", type=float,
+                            help="specify it in a form X.XX")
         parser.add_argument("--embed_dim", type=int, default=256)
         parser.add_argument("--bidirectional", type=bool, default=False)
         parser.add_argument("--dropout", type=float, default=0)
@@ -30,7 +32,6 @@ class RaceModule(pl.LightningModule):
                             help="hidden_sz of the GRU")
         parser.add_argument("--num_layers", type=int, default=1,
                             help="Number of layers in the GRU.")
-
         parser.add_argument("--learning_rate", type=float, default=1e-3,
                             help="Learning rate.")
         parser.add_argument("--num_training_steps", type=int, default=1000,
