@@ -43,7 +43,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer.from_argparse_args(args)
         
     
-    fx_model = RaceModule.load_from_checkpoint("models/ckpts/t5.ckpt")
+    fx_model = RaceModule.load_from_checkpoint("models/ckpts/t5_que.ckpt")
     fx_model.setup_tune(top_p = 0.95, top_k = 50, no_repeat_ngram_size = 2)
     
     

@@ -1,7 +1,7 @@
 data_path: "data/RACE_processed"
 d_model: 128
 nhead: 8
-batch_size: 1
+batch_size: 32
 num_workers: 0
 num_layers: 1
 top_p: 0.5

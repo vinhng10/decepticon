@@ -50,7 +50,7 @@ if __name__ == "__main__":
     
     fx_dm.setup()
     
-    fx_model = RaceModule.load_from_checkpoint("D:/Github/decepticon/project/models/ckpts/t5.ckpt")
+    fx_model = RaceModule.load_from_checkpoint("D:/Github/decepticon/project/models/ckpts/t5_que.ckpt")
     fx_model.setup_tune(top_p = 0.8, top_k = 40, no_repeat_ngram_size = 4)
 
     fx_model.eval()
