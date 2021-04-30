@@ -5,7 +5,8 @@ import torch
 import pytorch_lightning as pl
 from torch.nn import functional as F
 from transformers import (
-    T5ForConditionalGeneration, T5Config, AutoTokenizer, AdamW
+    T5ForConditionalGeneration, T5Config, AutoTokenizer, AdamW, BertForSequenceClassification
+
 )
 
 from metrics.metrics import Input, Metrics
@@ -51,6 +52,8 @@ class RaceModule(pl.LightningModule):
             self.model = T5ForConditionalGeneration(config).from_pretrained(self.hparams.pretrained_model)
             # Tokenizer:
             self.tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
+            self.tokenizer_.add_special_tokens({"additional_special_tokens": ["[CON]","[QUE]","[ANS]","[DIS]"]})
+
             # Metrics:
             self.metrics = Metrics()
             try:
@@ -61,11 +64,12 @@ class RaceModule(pl.LightningModule):
             raise NotImplementedError
             
             
-    def setup_tune(self, top_k: int = 50, top_p: float = 0.95, no_repeat_ngram_size: int = 2):
+    def setup_tune(self, top_k: int = 50, top_p: float = 0.95, no_repeat_ngram_size: int = 2, num_samples = 5):
         """"""
         self.top_k = top_k ##1 75
         self.top_p = top_p ##2 0.9
         self.no_repeat_ngram_size = no_repeat_ngram_size
+        self.num_samples = num_samples
 
     def mask_label_padding(self, labels):
         """"""
@@ -143,6 +147,11 @@ class RaceModule(pl.LightningModule):
             use_sample=True,
             max_length=64,
         )
+        try:
+            if self.num_samples > 1:
+                y["input_ids"] = torch.repeat_interleave(y["input_ids"], expand_size, dim = 0)
+        except:
+            pass
 
         predictions = [
             self.tokenizer.decode(generation, skip_special_tokens=True)
@@ -185,7 +194,8 @@ class RaceModule(pl.LightningModule):
                                top_p: float = 0.95, ##2 0.9
                                max_length: int = 64,
                                do_sample: bool = True,
-                               no_repeat_ngram_size: int = 2):
+                               no_repeat_ngram_size: int = 2,
+                               num_samples = 1):
         """"""
         # [bsz, pred_len]
         try: ## for tuning
@@ -193,6 +203,7 @@ class RaceModule(pl.LightningModule):
             top_k = self.top_k ##1 75
             top_p = self.top_p ##2 0.9
             no_repeat_ngram_size = self.no_repeat_ngram_size
+            num_samples = self.num_samples
         except:
             pass
         
@@ -200,11 +211,11 @@ class RaceModule(pl.LightningModule):
                                         max_length=max_length,
                                         do_sample=do_sample,
                                         no_repeat_ngram_size=no_repeat_ngram_size,
-                                        #repetition_penalty = 0.5,
+                                        num_return_sequences=num_samples,
                                         top_k=top_k,
                                         top_p=top_p)
-
         return generated
+
 
     def generate_question(self, article, answer, pred_len=64):
         tokenizer = AutoTokenizer.from_pretrained(self.hparams.pretrained_model)
