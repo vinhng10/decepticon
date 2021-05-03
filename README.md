@@ -7,10 +7,9 @@ We aim at an end-to-end solution for automatic generation of multiple choice que
 First, install dependencies   
 ```bash
 # clone project   
-git clone https://github.com/YourGithubName/deep-learning-project-template
+git clone https://github.com/vinhng10/decepticon.git
 
 # install project   
-cd deep-learning-project-template 
 pip install -e .   
 pip install -r requirements.txt
  ```   
