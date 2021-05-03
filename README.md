@@ -18,7 +18,7 @@ pip install -r requirements.txt
 # module folder
 cd project
 
-# run module (example: mnist as your main contribution)   
+# run module 
 python main.py    
 ```
 # Decepticon - Multiple Choice Question & Distractors Generation   
