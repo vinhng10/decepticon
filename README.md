@@ -1,4 +1,5 @@
-# Decepticon - Multiple Choice Question Generation   
+# Decepticon - Multiple Choice Question & Distractors Generation   
+Here are the links to the thorough [literature survey](https://github.com/vinhng10/decepticon/blob/master/documents/NLP_Literature_Review_2021.pdf) and [final report](https://github.com/vinhng10/decepticon/blob/master/documents/NLP_Final_Report.pdf) of the project.
  
 ## Description   
 We aim at an end-to-end solution for automatic generation of multiple choice questions for English exams. Creating such exam could be time-consuming, therefore, a model that can suggest question as well as possible choices could potentially speed up the process and improve the exam quality.
@@ -21,11 +22,6 @@ cd project
 # run module 
 python main.py    
 ```
-# Decepticon - Multiple Choice Question & Distractors Generation   
-Here are the links to the thorough [literature survey](https://github.com/vinhng10/decepticon/blob/master/documents/NLP_Literature_Review_2021.pdf) and [final report](https://github.com/vinhng10/decepticon/blob/master/documents/NLP_Final_Report.pdf) of the project.
-
-## Description   
-We aim at an end-to-end solution for automatic generation of multiple choice questions for English exams. Creating such exam could be time-consuming, therefore, a model that can suggest question as well as possible choices could potentially speed up the process and improve the exam quality.
 
 ## Dataset
 ReAding  Com-prehension Dataset From Examination or RACE (Lai et al. 2017) is used in this project. The dataset consists of middle  and  high  school  exam  multiple-choice  questions.  It  contains  around  28000  unique  articles  and 100000  unique  question-answer  pairs. The  dataset  is  already  split  into  train,  validationand  test  sets.
